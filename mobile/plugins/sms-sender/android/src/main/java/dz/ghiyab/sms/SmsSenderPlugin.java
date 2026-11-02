@@ -29,6 +29,7 @@ import android.webkit.WebView;
 import android.telephony.SmsManager;
 import android.telephony.SubscriptionInfo;
 import android.telephony.SubscriptionManager;
+import android.telephony.TelephonyManager;
 
 import com.getcapacitor.JSArray;
 import android.view.WindowManager;
@@ -55,7 +56,8 @@ import java.util.UUID;
     name = "SmsSender",
     permissions = {
         @Permission(alias = "sms", strings = { Manifest.permission.SEND_SMS }),
-        @Permission(alias = "phone", strings = { Manifest.permission.READ_PHONE_STATE })
+        @Permission(alias = "phone", strings = { Manifest.permission.READ_PHONE_STATE }),
+        @Permission(alias = "call", strings = { Manifest.permission.CALL_PHONE })
     }
 )
 public class SmsSenderPlugin extends Plugin {
@@ -300,7 +302,7 @@ public class SmsSenderPlugin extends Plugin {
                     if (code != Activity.RESULT_OK) {
                         finished[0] = true;
                         safeUnregister(ctx, this);
-                        call.reject(errorText(code));
+                        call.reject(errorText(code), errorCode(code));
                         return;
                     }
                     done[0]++;
@@ -361,6 +363,72 @@ public class SmsSenderPlugin extends Plugin {
 
     private static void safeUnregister(Context ctx, BroadcastReceiver r) {
         try { ctx.unregisterReceiver(r); } catch (Exception ignored) { }
+    }
+
+    private static String errorCode(int code) {
+        switch (code) {
+            case SmsManager.RESULT_ERROR_NO_SERVICE: return "NO_SERVICE";
+            case SmsManager.RESULT_ERROR_RADIO_OFF: return "RADIO_OFF";
+            case SmsManager.RESULT_ERROR_NULL_PDU: return "NULL_PDU";
+            case SmsManager.RESULT_ERROR_GENERIC_FAILURE: return "GENERIC";
+            default: return "E" + code;
+        }
+    }
+
+    // الاستعلام عن الرصيد برمز USSD (مثل *222#) دون مغادرة التطبيق — أندرويد 8 فما فوق
+    @PluginMethod
+    public void checkBalance(PluginCall call) {
+        if (Build.VERSION.SDK_INT < 26) { call.reject("الاستعلام عن الرصيد يتطلب أندرويد 8 أو أحدث"); return; }
+        if (getPermissionState("call") != PermissionState.GRANTED) {
+            requestPermissionForAlias("call", call, "callPermCallback");
+            return;
+        }
+        doUssd(call);
+    }
+
+    @PermissionCallback
+    private void callPermCallback(PluginCall call) {
+        if (getPermissionState("call") == PermissionState.GRANTED) doUssd(call);
+        else call.reject("لم يُسمح بالاستعلام عن الرصيد. فعّل إذن «الهاتف/المكالمات» من إعدادات التطبيق.");
+    }
+
+    private void doUssd(final PluginCall call) {
+        final String code = call.getString("code");
+        if (code == null || code.trim().isEmpty()) { call.reject("رمز الاستعلام فارغ"); return; }
+        TelephonyManager tm = (TelephonyManager) getContext().getSystemService(Context.TELEPHONY_SERVICE);
+        if (tm == null) { call.reject("الجهاز لا يدعم الاتصالات"); return; }
+        Integer sub = call.getInt("subscriptionId");
+        if (sub != null && sub >= 0) {
+            try { tm = tm.createForSubscriptionId(sub); } catch (Exception ignored) { }
+        }
+        final boolean[] done = { false };
+        final Handler h = new Handler(Looper.getMainLooper());
+        try {
+            tm.sendUssdRequest(code.trim(), new TelephonyManager.UssdResponseCallback() {
+                @Override
+                public void onReceiveUssdResponse(TelephonyManager t, String req, CharSequence resp) {
+                    synchronized (done) { if (done[0]) return; done[0] = true; }
+                    JSObject r = new JSObject();
+                    r.put("text", resp == null ? "" : resp.toString());
+                    call.resolve(r);
+                }
+                @Override
+                public void onReceiveUssdResponseFailed(TelephonyManager t, String req, int failureCode) {
+                    synchronized (done) { if (done[0]) return; done[0] = true; }
+                    call.reject("لم يردّ المتعامل على طلب الرصيد (رمز " + failureCode + ")");
+                }
+            }, h);
+        } catch (SecurityException e) {
+            call.reject("لا توجد صلاحية للاستعلام عن الرصيد");
+            return;
+        } catch (Exception e) {
+            call.reject("تعذّر الاستعلام: " + e.getMessage());
+            return;
+        }
+        h.postDelayed(() -> {
+            synchronized (done) { if (done[0]) return; done[0] = true; }
+            call.reject("انتهت مهلة انتظار رد المتعامل");
+        }, 40000);
     }
 
     private static String errorText(int code) {

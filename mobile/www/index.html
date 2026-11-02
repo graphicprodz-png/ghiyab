@@ -85,6 +85,12 @@ td.ltr{direction:ltr;text-align:end}
 .dialog{background:#fff;border-radius:16px;padding:16px;max-width:420px;width:100%}
 .hide{display:none!important}
 .about{text-align:center;padding:24px 16px}
+.credban{display:flex;gap:12px;align-items:center;flex-wrap:wrap;border-radius:12px;padding:12px 14px;margin-bottom:12px;font-size:14px}
+.credban>div:first-child{flex:1 1 260px}
+.credban.red{background:var(--red-2);color:var(--red);border:2px solid var(--red);animation:credpulse 1.6s ease-in-out infinite}
+.credban.amb{background:var(--amber-2);color:var(--amber);border:1px solid #f0d9ae}
+@keyframes credpulse{50%{box-shadow:0 0 0 6px rgba(192,57,43,.15)}}
+.balrow{display:flex;gap:10px;align-items:center;justify-content:space-between;border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-bottom:8px}
 .licbox{max-width:440px;margin:10px auto 0;text-align:center}
 .devcode{font:700 26px/1.3 ui-monospace,Menlo,Consolas,monospace;letter-spacing:2px;color:var(--brand);background:var(--brand-2);border:1px dashed var(--brand);border-radius:12px;padding:10px;margin:6px 0 10px}
 .licbox textarea{width:100%;font-family:ui-monospace,monospace;font-size:13px}
@@ -277,7 +283,7 @@ const DEFAULT_CFG={
   warn1:6, warn2:12,
   calendar:[{id:"h1",type:"holiday",name:"عيد الثورة (1 نوفمبر)",from:"2026-11-01",to:"2026-11-01"},{id:"h2",type:"holiday",name:"رأس السنة الميلادية",from:"2027-01-01",to:"2027-01-01"},{id:"h3",type:"holiday",name:"يناير — رأس السنة الأمازيغية",from:"2027-01-12",to:"2027-01-12"},{id:"h4",type:"holiday",name:"عيد العمال",from:"2027-05-01",to:"2027-05-01"}],
   pin:"",
-  appPin:"", appRecovery:"", lockAfter:0,
+  appPin:"", appRecovery:"", lockAfter:0, lowCredit:100, autoBalance:false,
   lastBackup:0,
   autoBackup:false, autoBackupH:1, lastAutoBackup:0, lastDailyBackup:"", autoBackupErr:"",
   autoSms:true,
@@ -458,7 +464,7 @@ function render(){
   const active=document.activeElement&&document.activeElement.id;
   setTimeout(()=>{ if(view==="settings"&&setTab==="msg") smsCount(); },0);
   if(S.cfg.pin&&(PROTECTED.includes(view)||(view==="att"&&session&&session.date<todayStr()))&&Date.now()>unlockUntil){ m.innerHTML=pinScreen(); setTimeout(()=>{const x=document.getElementById("pinIn"); x&&x.focus()},30); return; }
-  m.innerHTML=(view==="session"?licBanner():"")+({reports:vReports,letter:vLetter,session:vHome,round:vRound,week:vWeek,day:vDay,att:vAtt,sessions:vSessions,report:vReport,notifs:vNotifs,students:vStudents,timetable:vTimetable,staff:vStaff,labels:vLabels,settings:vSettings}[view]||vSession)();
+  m.innerHTML=creditBanner()+(view==="session"?licBanner():"")+({reports:vReports,letter:vLetter,session:vHome,round:vRound,week:vWeek,day:vDay,att:vAtt,sessions:vSessions,report:vReport,notifs:vNotifs,students:vStudents,timetable:vTimetable,staff:vStaff,labels:vLabels,settings:vSettings}[view]||vSession)();
   if(["reports","letter"].includes(view)) setTimeout(fitSheets,0);
   if(active==="scanInput"){ const s=document.getElementById("scanInput"); if(s) s.focus(); }
 }
@@ -853,13 +859,23 @@ async function autoSendTick(){
       const st=S.students.find(s=>s.id===a.studentId)||{};
       const phone=intlPhone(st.phone);
       if(!phone){ await put("absences",{...a,status:"failed",lastError:"لا يوجد رقم هاتف للولي"}); continue; }
+      const sim=pickSim(st.phone), key=simKey(sim);
+      if(creditPaused().includes(key)) continue; // الشريحة متوقفة لنفاد الرصيد
       try{
-        const sim=pickSim(st.phone);
         await smsPlugin().send({phone:"+"+phone,message:message(a),...(sim!=null?{subscriptionId:sim}:{})});
+        simFails[key]=0;
         await put("absences",{...a,status:"sent",channel:"sms",via:simLabel(sim),sentAt:Date.now(),attempts:(a.attempts||0)+1,lastError:""});
       }catch(e){
+        const err=String((e&&e.message)||e).slice(0,300), credit=e&&e.code==="GENERIC";
+        if(credit) simFails[key]=(simFails[key]||0)+1;
+        if(credit&&simFails[key]>=2){
+          // فشلان متتاليان من نفس الشريحة: نفاد الرصيد على الأرجح — لا تُحتسب المحاولة، وتبقى الرسالة في الانتظار
+          await put("absences",{...a,status:"waiting",lastError:err,notifyAt:Date.now()+120000});
+          await creditAlarm(sim);
+          continue;
+        }
         const n=(a.attempts||0)+1;
-        await put("absences",{...a,attempts:n,status:n>=3?"failed":"waiting",lastError:String((e&&e.message)||e).slice(0,300),notifyAt:Date.now()+120000});
+        await put("absences",{...a,attempts:n,status:n>=3?"failed":"waiting",lastError:err,notifyAt:Date.now()+120000});
       }
     }
   }finally{ sending=false; }
@@ -1065,7 +1081,7 @@ function setSms(){
       <button class="btn ghost" style="flex:0 0 auto" onclick="testSms()">إرسال رسالة تجريبية</button></div>
       <p class="muted" style="margin:4px 0 0">تُرسل الرسالة التجريبية من الشريحة المناسبة لمتعامل الرقم المكتوب.</p>`
     :`<p class="muted" style="margin:0">الإرسال الآلي يعمل فقط في تطبيق الطابليت (APK) لأنه يستعمل شريحة الجهاز.</p>`}
-  </div>${simsCard()}`;
+  </div>${creditCard()}${simsCard()}`;
 }
 function setData(){
   const c=S.cfg, days=c.lastBackup?Math.floor((Date.now()-c.lastBackup)/86400000):null;
@@ -2092,6 +2108,96 @@ async function seedDemo(){
   });
   saveLocal();
   selClass=firstId; lsSet("ghiyab_selClass",firstId); toast("أُضيفت 4 أقسام تجريبية بتلاميذها وأساتذتها وجداول توقيتها");
+}
+
+/* ============ رصيد الشريحة: اكتشاف نفاد الرصيد والتنبيه ============ */
+const USSD_DEF={mobilis:"*222#",djezzy:"*710#",ooredoo:"*200#"};
+const simKey=sim=>sim==null?"def":String(sim);
+const simFails={};
+function simOp(sim){ const x=(S.cfg.simsCache||[]).find(z=>String(z.id)===String(sim)); if(!x) return null; return Object.keys(OPS).find(op=>OPS[op].re.test((x.carrier||"")+" "+(x.name||"")))||null; }
+function ussdFor(sim){ const op=simOp(sim), u=S.cfg.ussd||{}; return (op&&(u[op]||USSD_DEF[op]))||u.mobilis||USSD_DEF.mobilis; }
+const creditPaused=()=>((S.cfg.creditAlert&&S.cfg.creditAlert.sims)||[]);
+function pendingFor(key){ return S.absences.filter(a=>a.status==="waiting"&&simKey(pickSim((S.students.find(s=>s.id===a.studentId)||{}).phone))===key).length; }
+function parseAmount(t){ const m=String(t||"").replace(/ /g," ").match(/(\d[\d\s]*[.,]?\d*)\s*(DA|DZD|دج|د\.ج|dinars?)/i); return m?parseFloat(m[1].replace(/\s/g,"").replace(",",".")):null; }
+function alarmBeep(){
+  try{ navigator.vibrate&&navigator.vibrate([400,150,400,150,800]); }catch(e){}
+  try{ const A=new (window.AudioContext||window.webkitAudioContext)(); [0,0.35,0.7].forEach(t=>{ const o=A.createOscillator(),g=A.createGain(); o.frequency.value=880; o.connect(g); g.connect(A.destination); g.gain.setValueAtTime(0.25,A.currentTime+t); g.gain.exponentialRampToValueAtTime(0.001,A.currentTime+t+0.3); o.start(A.currentTime+t); o.stop(A.currentTime+t+0.3); }); }catch(e){}
+}
+async function creditAlarm(sim){
+  const key=simKey(sim), cur=creditPaused();
+  if(cur.includes(key)) return;
+  await saveCfg({...S.cfg,creditAlert:{sims:[...cur,key],at:Date.now()}});
+  alarmBeep();
+  checkBalance(sim,true).catch(()=>{});
+}
+async function creditResume(){
+  Object.keys(simFails).forEach(k=>delete simFails[k]);
+  const now=Date.now();
+  for(const a of S.absences.filter(a=>a.status==="waiting"&&a.notifyAt>now)) await put("absences",{...a,notifyAt:now});
+  await saveCfg({...S.cfg,creditAlert:null});
+  toast("استؤنف الإرسال"); autoSendTick().catch(()=>{});
+}
+async function checkBalance(sim,silent){
+  const pl=smsPlugin(); if(!pl||!pl.checkBalance){ if(!silent) toast("الاستعلام عن الرصيد يعمل في تطبيق الطابليت فقط",true); return; }
+  const key=simKey(sim), code=ussdFor(sim);
+  if(!silent) toast("جارٍ الاستعلام عن الرصيد ("+code+")…");
+  try{
+    const r=await pl.checkBalance({code,...(sim!=null?{subscriptionId:sim}:{})});
+    const txt=String(r.text||"").trim(), amt=parseAmount(txt);
+    await saveCfg({...S.cfg,balances:{...(S.cfg.balances||{}),[key]:{txt,amt,at:Date.now(),code}}});
+    const low=Number(S.cfg.lowCredit||0);
+    if(amt!=null&&low>0&&amt<low&&!creditPaused().includes(key)&&!silent) alarmBeep();
+    if(!silent) toast("الرصيد: "+(txt.slice(0,120)||"لا رد"));
+  }catch(e){
+    await saveCfg({...S.cfg,balances:{...(S.cfg.balances||{}),[key]:{txt:"تعذّر: "+((e&&e.message)||e),amt:null,at:Date.now(),code}}});
+    if(!silent) toast("تعذّر الاستعلام: "+((e&&e.message)||e),true);
+  }
+}
+function lowBalances(){
+  const low=Number(S.cfg.lowCredit||0), b=S.cfg.balances||{};
+  if(!(low>0)) return [];
+  return Object.keys(b).filter(k=>b[k].amt!=null&&b[k].amt<low&&Date.now()-b[k].at<36*3600000);
+}
+function creditBanner(){
+  const p=creditPaused(), lows=lowBalances().filter(k=>!p.includes(k));
+  let h="";
+  if(p.length){
+    const n=p.reduce((s,k)=>s+pendingFor(k),0), b=S.cfg.balances||{};
+    h+=`<div class="credban red"><div><b>⚠️ توقف الإرسال: رصيد ${p.map(k=>esc(simLabel(k==="def"?undefined:k))).join(" و")} نفد على الأرجح.</b><br>
+      ${n} رسالة في الانتظار ولن تضيع. اشحن الرصيد ثم اضغط «استئناف الإرسال».
+      ${p.map(k=>b[k]?`<div class="muted" style="margin-top:4px">آخر رد من المتعامل: <bdi dir="auto">${esc(b[k].txt.slice(0,160))}</bdi></div>`:"").join("")}</div>
+      <div class="row" style="flex:0 0 auto;gap:6px">${p.map(k=>`<button class="btn ghost" style="flex:0 0 auto" onclick="checkBalance(${k==="def"?"undefined":k})">🔎 فحص الرصيد</button>`).join("")}
+      <button class="btn" style="flex:0 0 auto" onclick="creditResume()">▶️ استئناف الإرسال</button></div></div>`;
+  }
+  if(lows.length){
+    const b=S.cfg.balances;
+    h+=`<div class="credban amb">🔋 رصيد منخفض: ${lows.map(k=>`${esc(simLabel(k==="def"?undefined:k))} — <b>${b[k].amt} دج</b>`).join(" · ")}. اشحن قبل أن يتوقف الإرسال.</div>`;
+  }
+  return h;
+}
+// فحص يومي تلقائي للرصيد عند بداية ساعات الإرسال
+setInterval(()=>{
+  if(!IS_APP||!S.cfg.autoBalance||licBlocked()) return;
+  const d=todayStr(), w=S.cfg.sendWindow||{}, hm=nowHM();
+  if(S.cfg.balanceDay===d||(w.from&&hm<w.from)) return;
+  S.cfg.balanceDay=d; saveLocal();
+  const sims=[...new Set(Object.values(S.cfg.simMap||{}).concat([S.cfg.simDefault]).filter(x=>x!=null&&x!==""))];
+  (sims.length?sims:[undefined]).reduce((p,s)=>p.then(()=>checkBalance(s==null?undefined:Number(s),true)),Promise.resolve()).then(()=>{ if(lowBalances().length){ alarmBeep(); render(); } });
+},60000);
+function creditCard(){
+  if(!IS_APP) return "";
+  const sims=S.cfg.simsCache||[], b=S.cfg.balances||{}, u=S.cfg.ussd||{};
+  const list=sims.length?sims.map(x=>({sim:x.id,label:`شريحة ${x.slot+1} — ${x.carrier||x.name}`})):[{sim:undefined,label:"الشريحة الافتراضية"}];
+  return `<div class="card"><h2>💳 رصيد الشرائح</h2>
+    <p class="muted" style="margin-top:0">إذا فشلت رسالتان متتاليتان من نفس الشريحة بسبب الرصيد، يتوقف الإرسال منها ويظهر تنبيه أحمر في كل الصفحات مع صوت واهتزاز. الرسائل تبقى في الانتظار وتُرسل بعد الشحن والضغط على «استئناف الإرسال».</p>
+    ${list.map(o=>{ const k=simKey(o.sim), r=b[k]; return `<div class="balrow"><div><b>${esc(o.label)}</b> <span class="muted">(${esc(ussdFor(o.sim))})</span>
+      <div class="muted">${r?`<bdi dir="auto">${esc(r.txt.slice(0,200))}</bdi> — <bdi>${new Date(r.at).toLocaleString("ar-DZ")}</bdi>`:"لم يُفحص بعد"}</div></div>
+      <button class="btn ghost" style="flex:0 0 auto" onclick="checkBalance(${o.sim==null?"undefined":o.sim})">🔎 فحص الرصيد</button></div>`; }).join("")}
+    <div class="row">${Object.keys(OPS).map(op=>`<label class="f">رمز رصيد ${OPS[op].name}<input dir="ltr" value="${esc(u[op]||USSD_DEF[op])}" onchange="saveCfg({...S.cfg,ussd:{...(S.cfg.ussd||{}),${op}:this.value.trim()}})"></label>`).join("")}</div>
+    <label class="switch"><input type="checkbox" ${S.cfg.autoBalance?"checked":""} onchange="saveCfg({...S.cfg,autoBalance:this.checked})"> فحص الرصيد تلقائياً كل يوم عند بداية ساعات الإرسال</label>
+    <label class="f" style="max-width:260px">نبّهني إذا نزل الرصيد تحت (دج)<input type="number" min="0" dir="ltr" value="${esc(S.cfg.lowCredit??100)}" onchange="saveCfg({...S.cfg,lowCredit:Number(this.value)||0})"></label>
+    <p class="muted" style="margin:0">ملاحظة: مع عروض «رسائل غير محدودة» قد يبقى الإرسال يعمل حتى لو كان الرصيد النقدي منخفضاً.</p>
+  </div>`;
 }
 
 /* ============ الترخيص — مفاتيح مركز التراخيص (HD1 · ECDSA P-256) ============ */
