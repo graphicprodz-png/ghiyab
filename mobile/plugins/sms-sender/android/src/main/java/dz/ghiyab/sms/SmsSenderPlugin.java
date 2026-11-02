@@ -10,6 +10,10 @@ import android.content.IntentFilter;
 import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
+import android.print.PrintAttributes;
+import android.print.PrintDocumentAdapter;
+import android.print.PrintManager;
+import android.webkit.WebView;
 import android.telephony.SmsManager;
 import android.telephony.SubscriptionInfo;
 import android.telephony.SubscriptionManager;
@@ -111,6 +115,28 @@ public class SmsSenderPlugin extends Plugin {
         r.put("sims", arr);
         r.put("defaultSms", def);
         call.resolve(r);
+    }
+
+    /** طباعة الصفحة الحالية أو حفظها PDF (A4 أفقي) عبر نافذة الطباعة في أندرويد */
+    @PluginMethod
+    public void print(PluginCall call) {
+        final String name = call.getString("name", "ghiyab");
+        final boolean landscape = call.getBoolean("landscape", true);
+        Activity act = getActivity();
+        if (act == null) { call.reject("لا توجد واجهة"); return; }
+        act.runOnUiThread(() -> {
+            try {
+                WebView wv = getBridge().getWebView();
+                PrintManager pm = (PrintManager) act.getSystemService(Context.PRINT_SERVICE);
+                PrintDocumentAdapter adapter = wv.createPrintDocumentAdapter(name);
+                PrintAttributes.MediaSize size = landscape ? PrintAttributes.MediaSize.ISO_A4.asLandscape() : PrintAttributes.MediaSize.ISO_A4;
+                PrintAttributes attrs = new PrintAttributes.Builder().setMediaSize(size).build();
+                pm.print(name, adapter, attrs);
+                call.resolve();
+            } catch (Exception e) {
+                call.reject("تعذّرت الطباعة: " + e.getMessage());
+            }
+        });
     }
 
     @PluginMethod
