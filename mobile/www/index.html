@@ -126,6 +126,11 @@ table.wk tr.today td.cur span{color:#e9fff1}
 .roundcard{display:flex;align-items:center;gap:12px;cursor:pointer;flex-wrap:wrap}
 .roundcard>div:first-child{flex:1}
 .prog{flex:1 1 120px;height:9px;background:var(--brand-2);border-radius:99px;overflow:hidden}.prog i{display:block;height:100%;background:var(--brand)}
+table.wk tr.hol td{background:#f1f1ef;color:var(--muted);text-align:center}
+table.wk tr.exm td{background:#eef3fb;text-align:center}
+table.wk tr.today.exm td{background:#d9ecdf}
+.calrow.past{opacity:.6}
+.extbl input,.extbl select{padding:6px;font-size:13px;min-width:90px}
 .mv{border:0;background:none;color:var(--muted);cursor:pointer;padding:0 2px;font-size:11px}
 .rtool{display:flex;gap:8px;align-items:center;flex-wrap:wrap;background:#fff;border:1px solid var(--line);border-radius:12px;padding:8px;margin-bottom:10px}
 .rtool .zoom{display:inline-flex;gap:4px;align-items:center;margin-inline-start:auto}
@@ -231,6 +236,7 @@ const DEFAULT_CFG={
   sendMode:"auto",
   terms:[{name:"الفصل الأول",from:"2026-09-21",to:"2026-12-17"},{name:"الفصل الثاني",from:"2027-01-04",to:"2027-03-18"},{name:"الفصل الثالث",from:"2027-04-04",to:"2027-06-10"}],
   warn1:6, warn2:12,
+  calendar:[{id:"h1",type:"holiday",name:"عيد الثورة (1 نوفمبر)",from:"2026-11-01",to:"2026-11-01"},{id:"h2",type:"holiday",name:"رأس السنة الميلادية",from:"2027-01-01",to:"2027-01-01"},{id:"h3",type:"holiday",name:"يناير — رأس السنة الأمازيغية",from:"2027-01-12",to:"2027-01-12"},{id:"h4",type:"holiday",name:"عيد العمال",from:"2027-05-01",to:"2027-05-01"}],
   pin:"",
   lastBackup:0,
   autoSms:true,
@@ -246,12 +252,12 @@ const DEFAULT_CFG={
   cc:"213",
   template:"{المؤسسة}: ابنكم {الاسم} ({القسم}) غائب عن حصة {المادة} يوم {التاريخ} من {من} إلى {إلى}."
 };
-const S={classes:[],students:[],absences:[],subjects:[],teachers:[],timetable:[],sessions:[],cfg:{...DEFAULT_CFG}};
+const S={classes:[],students:[],absences:[],subjects:[],teachers:[],timetable:[],sessions:[],exams:[],cfg:{...DEFAULT_CFG}};
 const DB=null;
 const LS_KEY="ghiyab_v1";
 function lsGet(k){try{return JSON.parse(localStorage.getItem(k))}catch(e){return null}}
 function lsSet(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}
-const DATA_KEYS=["classes","students","absences","subjects","teachers","timetable","sessions"];
+const DATA_KEYS=["classes","students","absences","subjects","teachers","timetable","sessions","exams"];
 function saveLocal(){ if(!DB){ const o={cfg:S.cfg}; DATA_KEYS.forEach(k=>o[k]=S[k]); lsSet(LS_KEY,o); } }
 const DEFAULT_SUBJECTS=["الرياضيات","اللغة العربية","اللغة الفرنسية","اللغة الإنجليزية","العلوم الطبيعية","العلوم الفيزيائية","التاريخ والجغرافيا","التربية الإسلامية","الفلسفة","الإعلام الآلي","التربية البدنية","التربية المدنية","اللغة الأمازيغية"];
 (function loadLocal(){
@@ -427,6 +433,34 @@ function emptyData(){
 }
 
 /* --- Session / attendance --- */
+/* ============ الرزنامة: العطل والاختبارات والتوقيت الخاص ============ */
+const CAL_T={holiday:["🏖️","عطلة"],exam:["📝","فترة اختبارات"],special:["🕐","توقيت خاص"]};
+function calOn(date){ const L=(S.cfg.calendar||[]).filter(e=>date>=e.from&&date<=e.to); return L.find(e=>e.type==="holiday")||L.find(e=>e.type==="exam")||L.find(e=>e.type==="special")||null; }
+function periodsOn(date){ const sp=(S.cfg.calendar||[]).find(e=>e.type==="special"&&date>=e.from&&date<=e.to); const base=S.cfg.periods||[];
+  return sp?base.map(p=>({...p,...((sp.periods||{})[p.id]||{})})):base; }
+function examClasses(e){ const t=e.target||"all"; if(t==="all") return S.classes.map(c=>c.id); if(t.startsWith("lv:")) return S.classes.filter(c=>c.level===t.slice(3)).map(c=>c.id); return [t.slice(3)].filter(cls); }
+// كل حصص يوم معيّن (من الجدول العادي، أو من برنامج الاختبارات، أو لا شيء في العطلة)
+function slotsOn(date,classId){
+  const c=calOn(date), dow=new Date(date+"T12:00:00").getDay();
+  if(c&&c.type==="holiday") return [];
+  if(c&&c.type==="exam") return (S.exams||[]).filter(e=>e.date===date&&e.calId===c.id).flatMap(e=>examClasses(e).filter(id=>!classId||id===classId).map(id=>({key:"ex:"+e.id+":"+id,kind:"exam",examId:e.id,classId:id,
+      subject:"اختبار "+((subj(e.subjectId)||{}).name||""),teacher:e.supervisor||"",from:e.from,to:e.to,sid:"ex_"+e.id+"_"+id}))).sort((a,b)=>a.from.localeCompare(b.from));
+  if(!(S.cfg.days||[]).includes(dow)) return [];
+  const ps=periodsOn(date);
+  return S.timetable.filter(x=>x.day===dow&&(!classId||x.classId===classId)&&cls(x.classId)&&subj(x.subjectId)).map(x=>{ const p=ps.find(q=>q.id===x.periodId); if(!p) return null; const t=slotTeacher(x);
+    return {key:"tt:"+x.id,kind:"tt",slotId:x.id,classId:x.classId,subject:subj(x.subjectId).name,teacher:t?t.name:"",from:p.from,to:p.to,sid:"tt_"+x.id+"_"+date}; }).filter(Boolean).sort((a,b)=>a.from.localeCompare(b.from));
+}
+function openSlot(key,date){
+  date=date||todayStr(); const x=slotsOn(date).find(z=>z.key===key); if(!x) return toast("الحصة غير موجودة",true);
+  const ex=getSess(x.sid);
+  session={id:x.sid,slotId:x.slotId,examId:x.examId,key:x.key,classId:x.classId,subject:ex?ex.subject:x.subject,teacher:ex?ex.teacher:(x.teacher||"—"),date,from:x.from,to:x.to};
+  homeClass=x.classId; homeLevel=(cls(x.classId)||{}).level;
+  ensureSession(session); lsSet("ghiyab_session",session); openAtt();
+}
+const isSaved=sid=>{ const s2=getSess(sid); return !!(s2&&s2.savedAt); };
+function calBanner(date){ const c=calOn(date); if(!c) return "";
+  const t=CAL_T[c.type]; return `<div class="banner ${c.type==="holiday"?"amb":"ok"}">${t[0]} <b>${t[1]}: ${esc(c.name)}</b> — من ${fmtDate(c.from)} إلى ${fmtDate(c.to)}${c.type==="holiday"?". لا توجد حصص ولا تُسجّل غيابات.":c.type==="exam"?". تُسجّل الغيابات حسب برنامج الاختبارات.":". التوقيت معدّل لهذه الفترة."}</div>`; }
+
 /* ============ التدفق الرئيسي: السنة ← القسم ← الجدول الأسبوعي ← اليوم ← الحصة ============ */
 const classStudents=cid=>S.students.filter(s=>s.classId===cid); // ترتيب القائمة الرسمية
 function moveStudent(id,dir){
@@ -446,7 +480,7 @@ function vHome(){
   if(!lvls.includes(homeLevel)) homeLevel=lvls[0];
   const classes=S.classes.filter(c=>c.level===homeLevel).sort((a,b)=>a.name.localeCompare(b.name,"ar",{numeric:true}));
   if(!classes.some(c=>c.id===homeClass)) homeClass=null;
-  return `${roundSummary()}
+  return `${calBanner(todayStr())}${roundSummary()}
   <div class="card"><h2>1. اختر السنة</h2><div class="years">${lvls.map(l=>`<button class="${l===homeLevel?"on":""}" onclick="homeLevel='${esc(l)}';lsSet('ghiyab_level',homeLevel);homeClass=null;render()"><b>${yearLabel(l)}</b><span>${esc(yearSub(l))}</span></button>`).join("")}</div></div>
   <div class="card"><h2>2. اختر القسم — ${yearLabel(homeLevel)} ${esc(yearSub(homeLevel))}</h2><div class="years">${classes.map(c=>`<button class="${c.id===homeClass?"on":""}" onclick="homeClass='${c.id}';lsSet('ghiyab_class',homeClass);render()"><b>${esc(shortClass(c))}</b><span>${classStudents(c.id).length} تلميذ</span></button>`).join("")}</div>
     <button class="btn big" ${homeClass?"":"disabled"} onclick="view='week';render();window.scrollTo(0,0)">📅 دخول إلى جدول التوقيت الأسبوعي</button></div>
@@ -470,16 +504,23 @@ function vHome(){
 // الجدول الأسبوعي للقسم: يوم اليوم بالأخضر الخفيف، والحصة الحالية بالأخضر
 function vWeek(){
   const c=cls(homeClass); if(!c){ view="session"; return vHome(); }
-  const days=schoolDays(), pers=sortedPeriods(), today=new Date().getDay(), now=hmMin(nowHM());
-  const isToday=days.includes(today);
+  const days=schoolDays(), today=new Date().getDay(), td=todayStr(), now=hmMin(nowHM()), pers=sortedPeriods();
+  const sunday=addDays(td,-today), dateOf=d=>addDays(sunday,d), todaySl=slotsOn(td,c.id), cal=calOn(td);
+  const exPers=periodsOn(td);
   return `<div class="card"><div class="tbar"><button class="btn ghost sm" onclick="view='session';render()">→ رجوع</button>
-      <div><h2 style="margin:0">جدول التوقيت الأسبوعي — ${esc(c.name)}</h2><div class="muted">السنة الدراسية ${esc(S.cfg.schoolYear||"")}</div></div></div></div>
-    ${isToday?`<button class="btn big" style="margin-bottom:10px" onclick="openDay()">📋 فتح جدول اليوم (${DAY_NAMES[today]})</button>`:`<div class="banner amb">اليوم (${DAY_NAMES[today]}) ليس يوم دراسة حسب الإعدادات.</div>`}
+      <div><h2 style="margin:0">جدول التوقيت الأسبوعي — ${esc(c.name)}</h2><div class="muted">السنة الدراسية ${esc(S.cfg.schoolYear||"")} · الأسبوع من ${fmtDate(dateOf(0))} إلى ${fmtDate(dateOf(6))}</div></div></div></div>
+    ${calBanner(td)}
+    ${todaySl.length?`<button class="btn big" style="margin-bottom:10px" onclick="openDay()">📋 فتح ${cal&&cal.type==="exam"?"اختبارات":"جدول"} اليوم (${DAY_NAMES[today]})</button>`:cal&&cal.type==="holiday"?"":`<div class="banner amb">لا توجد حصص لهذا القسم اليوم (${DAY_NAMES[today]}).</div>`}
     <div class="card" style="overflow-x:auto;padding:8px">
     <table class="wk"><tr><th></th>${pers.map(p=>`<th>${p.from}<br><span>${p.to}</span></th>`).join("")}</tr>
-    ${days.map(d=>`<tr class="${d===today?"today":""}" ${d===today?'onclick="openDay()"':""}><th>${DAY_NAMES[d]}${d===today?'<br><span class="tag ok">اليوم</span>':""}</th>
-      ${pers.map(p=>{ const sl=slotAt(c.id,d,p.id); const cur=d===today&&now>=hmMin(p.from)&&now<hmMin(p.to); const t=sl&&slotTeacher(sl);
-        return `<td class="${cur?"cur":""}">${sl&&subj(sl.subjectId)?`<b>${esc(subj(sl.subjectId).name)}</b><span>${t?esc(t.name):""}</span>`:""}</td>`; }).join("")}</tr>`).join("")}
+    ${days.map(d=>{ const dt=dateOf(d), k=calOn(dt), isT=d===today;
+      const head=`<th>${DAY_NAMES[d]}<br><span>${fmtDate(dt).slice(0,5)}</span>${isT?'<br><span class="tag ok">اليوم</span>':""}</th>`;
+      if(k&&k.type!=="special"){ const ex=k.type==="exam"?slotsOn(dt,c.id):[];
+        return `<tr class="${isT?"today":""} ${k.type==="holiday"?"hol":"exm"}" ${isT&&ex.length?'onclick="openDay()"':""}>${head}<td colspan="${pers.length}">${CAL_T[k.type][0]} <b>${esc(k.name)}</b>${ex.length?" — "+ex.map(x=>`${esc(x.subject)} ${x.from}–${x.to}`).join(" · "):""}</td></tr>`; }
+      const ps=periodsOn(dt);
+      return `<tr class="${isT?"today":""}" ${isT?'onclick="openDay()"':""}>${head}
+      ${pers.map(p=>{ const pp=ps.find(q=>q.id===p.id)||p; const sl=slotAt(c.id,d,p.id); const cur=isT&&now>=hmMin(pp.from)&&now<hmMin(pp.to); const t=sl&&slotTeacher(sl);
+        return `<td class="${cur?"cur":""}">${sl&&subj(sl.subjectId)?`<b>${esc(subj(sl.subjectId).name)}</b><span>${t?esc(t.name):""}</span>${pp.from!==p.from?`<span>${pp.from}–${pp.to}</span>`:""}`:""}</td>`; }).join("")}</tr>`; }).join("")}
     </table></div>
     ${!S.timetable.some(x=>x.classId===c.id)?`<div class="banner amb">جدول هذا القسم فارغ. أدخله من «جدول التوقيت».</div>`:""}`;
 }
@@ -487,18 +528,17 @@ function openDay(){ view="day"; render(); window.scrollTo(0,0); }
 // جدول اليوم للقسم: الحصة الموافقة لساعة الطابليت بالأخضر
 function vDay(){
   const c=cls(homeClass); if(!c){ view="session"; return vHome(); }
-  const now=hmMin(nowHM()), d=new Date().getDay();
-  const list=S.timetable.filter(x=>x.classId===c.id&&x.day===d&&period(x.periodId)&&subj(x.subjectId)).map(x=>({...x,p:period(x.periodId)})).sort((a,b)=>a.p.from.localeCompare(b.p.from));
+  const now=hmMin(nowHM()), d=new Date().getDay(), td=todayStr(), list=slotsOn(td,c.id);
   return `<div class="card"><div class="tbar"><button class="btn ghost sm" onclick="view='week';render()">→ الأسبوع</button>
-      <div><h2 style="margin:0">${DAY_NAMES[d]} ${fmtDate(todayStr())} — ${esc(c.name)}</h2><div class="muted">اضغط على الحصة لفتح قائمة التلاميذ</div></div></div></div>
-    ${flashHTML()}
-    ${list.length?list.map(x=>{ const cur=now>=hmMin(x.p.from)&&now<hmMin(x.p.to), past=now>=hmMin(x.p.to); const t=slotTeacher(x);
-      const sid=ttSessionId(x), se=getSess(sid), n=S.absences.filter(a=>a.sessionId===sid).length;
-      return `<button class="dslot ${cur?"cur":""} ${past?"past":""}" onclick="startFromSlot('${x.id}')">
-        <span class="dt">${x.p.from}<br>${x.p.to}</span>
-        <span class="dm"><b>${esc(subj(x.subjectId).name)}</b><span>${t?"الأستاذ(ة) "+esc(t.name):"الأستاذ غير محدد"}</span></span>
+      <div><h2 style="margin:0">${DAY_NAMES[d]} ${fmtDate(td)} — ${esc(c.name)}</h2><div class="muted">اضغط على الحصة لفتح قائمة التلاميذ</div></div></div></div>
+    ${calBanner(td)}${flashHTML()}
+    ${list.length?list.map(x=>{ const cur=now>=hmMin(x.from)&&now<hmMin(x.to), past=now>=hmMin(x.to);
+      const se=getSess(x.sid), n=S.absences.filter(a=>a.sessionId===x.sid).length;
+      return `<button class="dslot ${cur?"cur":""} ${past?"past":""}" onclick="openSlot('${x.key}')">
+        <span class="dt">${x.from}<br>${x.to}</span>
+        <span class="dm"><b>${esc(x.subject)}</b><span>${x.kind==="exam"?(x.teacher?"الحارس(ة) "+esc(x.teacher):"اختبار"):x.teacher?"الأستاذ(ة) "+esc(x.teacher):"الأستاذ غير محدد"}</span></span>
         <span class="ds">${cur?'<span class="tag ok">الآن</span> ':""}${se&&se.savedAt?`<span class="tag ok">✓ محفوظ · ${n} غائب</span>`:past?'<span class="tag amb">لم يُسجّل</span>':""}</span>
-      </button>`; }).join(""):`<div class="card empty">لا توجد حصص لهذا القسم اليوم في الجدول.</div>`}`;
+      </button>`; }).join(""):`<div class="card empty">لا توجد حصص لهذا القسم اليوم.</div>`}`;
 }
 
 /* --- قائمة الحصة: الكل حاضر افتراضياً، تحويل الغائبين ثم الحفظ --- */
@@ -573,7 +613,7 @@ function attScan(v){
   att.absent.add(st.id); toast("✓ "+st.name+" غائب");
 }
 function leaveAtt(){
-  const back=session&&session.date<todayStr()?"sessions":session&&session.slotId?"day":"session";
+  const back=session&&session.date<todayStr()?"sessions":session&&(session.slotId||session.examId)?"day":"session";
   if(attDirty()) return askBox("لم تحفظ الغيابات","هل تريد الحفظ قبل الخروج؟","حفظ",()=>{ saveAttendance(true); view=back; render(); },"خروج بدون حفظ",()=>{ att=null; view=back; render(); });
   view=back; render();
 }
@@ -601,7 +641,7 @@ function saveAttendance(silent){
     <div style="font-size:40px">✅</div><h2 style="margin:4px 0">حُفظ ${esc(c?c.name:"")}</h2>
     <p>${att.absent.size} غائب · ${attRoster().length-att.absent.size} حاضر${kept?`<br><span class="muted">${kept} غياب أُعلم وليّه مسبقاً فبقي مسجلاً.</span>`:""}<br>
     <span class="muted">${manual?"الرسائل تنتظر الضغط على «إرسال الرسائل للأولياء».":"تُرسل الرسائل آلياً بعد "+S.cfg.delayMin+" دقيقة."}</span></p>
-    ${nx?`<button class="btn big" onclick="closeModal();startFromSlot('${nx.id}')">التالي: ${esc(cls(nx.classId).name)} — ${esc(subj(nx.subjectId).name)} ←</button>`:`<p class="tag ok" style="display:inline-block">انتهت كل أقسام هذه الفترة 👍</p>`}
+    ${nx?`<button class="btn big" onclick="closeModal();openSlot('${nx.key}')">التالي: ${esc(cls(nx.classId).name)} — ${esc(nx.subject)} ←</button>`:`<p class="tag ok" style="display:inline-block">انتهت كل أقسام هذه الفترة 👍</p>`}
     <div class="row" style="margin-top:8px"><button class="btn ghost" onclick="closeModal();roundPid=null;view='round';render()">دورة الفترة</button><button class="btn ghost" onclick="closeModal();render()">بقاء هنا</button></div></div></div>`;
   render();
 }
@@ -614,36 +654,35 @@ function askBox(title,msg,okTxt,okFn,altTxt,altFn){
 
 /* --- دورة الفترة: كل الأقسام التي عندها حصة في نفس الفترة --- */
 let roundPid=null;
-function currentPid(){ const now=hmMin(nowHM()); const ps=sortedPeriods(); const p=ps.find(p=>now>=hmMin(p.from)-10&&now<hmMin(p.to)); return p?p.id:null; }
-function roundSlots(pid){ const d=new Date().getDay(); return S.timetable.filter(x=>x.day===d&&x.periodId===pid&&cls(x.classId)&&subj(x.subjectId)).sort((a,b)=>cls(a.classId).name.localeCompare(cls(b.classId).name,"ar",{numeric:true})); }
+function roundWins(date){ const m={}; slotsOn(date).forEach(x=>{ m[x.from+"|"+x.to]=1; }); return Object.keys(m).sort(); }
+function currentWin(){ const now=hmMin(nowHM()); return roundWins(todayStr()).find(w=>{ const [f,t]=w.split("|"); return now>=hmMin(f)-10&&now<hmMin(t); })||null; }
+function roundSlotsW(w){ if(!w) return []; const [f,t]=w.split("|"); return slotsOn(todayStr()).filter(x=>x.from===f&&x.to===t).sort((a,b)=>cls(a.classId).name.localeCompare(cls(b.classId).name,"ar",{numeric:true})); }
 function nextInRound(se){
-  if(!se.slotId) return null; const sl=S.timetable.find(x=>x.id===se.slotId); if(!sl) return null;
-  return roundSlots(sl.periodId).find(x=>{ const s2=getSess(ttSessionId(x)); return !(s2&&s2.savedAt)&&ttSessionId(x)!==se.id; })||null;
+  if(se.date!==todayStr()) return null;
+  return roundSlotsW(se.from+"|"+se.to).find(x=>!isSaved(x.sid)&&x.sid!==se.id)||null;
 }
 function roundSummary(){
-  const pid=currentPid(); if(!pid) return "";
-  const sl=roundSlots(pid); if(!sl.length) return "";
-  const done=sl.filter(x=>{const s2=getSess(ttSessionId(x)); return s2&&s2.savedAt;}).length; const p=period(pid);
-  return `<div class="card roundcard" onclick="roundPid=null;view='round';render()"><div><b>⏱️ الفترة الحالية ${p.from}–${p.to}</b><div class="muted">${done} من ${sl.length} قسم سُجّل</div></div>
+  const w=currentWin(); if(!w) return ""; const sl=roundSlotsW(w); if(!sl.length) return "";
+  const done=sl.filter(x=>isSaved(x.sid)).length; const [f,t]=w.split("|");
+  return `<div class="card roundcard" onclick="roundPid=null;view='round';render()"><div><b>⏱️ الفترة الحالية ${f}–${t}</b><div class="muted">${done} من ${sl.length} قسم سُجّل</div></div>
     <div class="prog"><i style="width:${Math.round(done*100/sl.length)}%"></i></div><span class="btn sm">دورة الفترة ←</span></div>`;
 }
+
 function vRound(){
-  const ps=sortedPeriods(); const pid=roundPid||currentPid()||(ps[0]&&ps[0].id); const p=period(pid);
-  const sl=pid?roundSlots(pid):[]; const d=new Date().getDay();
-  const ids=sl.map(ttSessionId);
-  const abs=S.absences.filter(a=>ids.includes(a.sessionId));
-  const held=abs.filter(a=>a.status==="hold");
-  const done=sl.filter(x=>{const s2=getSess(ttSessionId(x)); return s2&&s2.savedAt;}).length;
+  const wins=roundWins(todayStr()), cw=currentWin(); const w=(roundPid&&wins.includes(roundPid))?roundPid:cw||wins[0]||null;
+  const sl=roundSlotsW(w), d=new Date().getDay(), ids=sl.map(x=>x.sid);
+  const abs=S.absences.filter(a=>ids.includes(a.sessionId)), held=abs.filter(a=>a.status==="hold"), done=sl.filter(x=>isSaved(x.sid)).length;
   return `<div class="card"><h2>دورة الفترة — ${DAY_NAMES[d]} ${fmtDate(todayStr())}</h2>
-    <div class="segs">${ps.map(x=>`<button class="${x.id===pid?"on":""}" onclick="roundPid='${x.id}';render()">${x.from}–${x.to}${x.id===currentPid()?" ●":""}</button>`).join("")}</div>
-    ${p?`<div class="prog" style="margin-top:10px"><i style="width:${sl.length?Math.round(done*100/sl.length):0}%"></i></div><p class="muted" style="margin:6px 0 0">${done} من ${sl.length} قسم سُجّل · ${abs.length} غائب في هذه الفترة</p>`:""}</div>
+    ${calBanner(todayStr())}
+    <div class="segs">${wins.map(x=>{ const [f,t]=x.split("|"); return `<button class="${x===w?"on":""}" onclick="roundPid='${x}';render()">${f}–${t}${x===cw?" ●":""}</button>`; }).join("")}</div>
+    ${w?`<div class="prog" style="margin-top:10px"><i style="width:${sl.length?Math.round(done*100/sl.length):0}%"></i></div><p class="muted" style="margin:6px 0 0">${done} من ${sl.length} قسم سُجّل · ${abs.length} غائب في هذه الفترة</p>`:""}</div>
     ${flashHTML()}
-    ${sl.length?sl.map(x=>{ const sid=ttSessionId(x), se=getSess(sid), n=S.absences.filter(a=>a.sessionId===sid).length, t=slotTeacher(x);
-      return `<button class="dslot ${se&&se.savedAt?"done":""}" onclick="homeClass='${x.classId}';homeLevel=cls('${x.classId}').level;startFromSlot('${x.id}')">
+    ${sl.length?sl.map(x=>{ const se=getSess(x.sid), n=S.absences.filter(a=>a.sessionId===x.sid).length;
+      return `<button class="dslot ${se&&se.savedAt?"done":""}" onclick="openSlot('${x.key}')">
         <span class="dt">${se&&se.savedAt?"✅":"⏳"}</span>
-        <span class="dm"><b>${esc(cls(x.classId).name)}</b><span>${esc(subj(x.subjectId).name)} · ${t?esc(t.name):"—"}</span></span>
+        <span class="dm"><b>${esc(cls(x.classId).name)}</b><span>${esc(x.subject)} · ${x.teacher?esc(x.teacher):"—"}</span></span>
         <span class="ds">${se&&se.savedAt?`<span class="tag ${n?"red":"ok"}">${n} غائب</span>`:'<span class="tag amb">لم يُسجّل</span>'}</span></button>`; }).join("")
-      :`<div class="card empty">لا توجد حصص في هذه الفترة اليوم حسب الجدول.</div>`}
+      :`<div class="card empty">لا توجد حصص اليوم${calOn(todayStr())&&calOn(todayStr()).type==="holiday"?" (عطلة)":""}.</div>`}
     <div class="card"><h2>إرسال الرسائل للأولياء</h2>
       ${held.length?`<p>${held.length} رسالة جاهزة بانتظار الإرسال: ${held.map(a=>esc(a.studentName)).join("، ")}</p>
         <button class="btn big" onclick="releaseHeld(a=>${JSON.stringify(ids).replace(/"/g,"&quot;")}.includes(a.sessionId))">📨 إرسال الرسائل للأولياء (${held.length})</button>`
@@ -894,11 +933,11 @@ function vLabels(){
 
 /* --- Settings --- */
 let setTab="school";
-const SET_TABS=[["school","🏫 المؤسسة"],["time","📅 السنة والتوقيت"],["msg","✉️ الرسائل"],["sms","📶 الإرسال والشرائح"],["data","🔒 الحماية والنسخ"],["help","❓ طريقة العمل"]];
+const SET_TABS=[["school","🏫 المؤسسة"],["time","📅 السنة والتوقيت"],["cal","📆 العطل والاختبارات"],["msg","✉️ الرسائل"],["sms","📶 الإرسال والشرائح"],["data","🔒 الحماية والنسخ"],["help","❓ طريقة العمل"]];
 function vSettings(){
   return `<div class="card noprint" style="padding:8px"><div class="segs">${SET_TABS.map(([k,t])=>`<button class="${k===setTab?"on":""}" onclick="setTab='${k}';flashMsg=null;render()">${t}</button>`).join("")}</div></div>
   ${flashHTML()}
-  ${({school:setSchool,time:periodsCard,msg:setMsg,sms:setSms,data:setData,help:setHelp}[setTab]||setSchool)()}`;
+  ${({school:setSchool,time:periodsCard,cal:setCal,msg:setMsg,sms:setSms,data:setData,help:setHelp}[setTab]||setSchool)()}`;
 }
 const WILAYAS=["أدرار","الشلف","الأغواط","أم البواقي","باتنة","بجاية","بسكرة","بشار","البليدة","البويرة","تمنراست","تبسة","تلمسان","تيارت","تيزي وزو","الجزائر","الجلفة","جيجل","سطيف","سعيدة","سكيكدة","سيدي بلعباس","عنابة","قالمة","قسنطينة","المدية","مستغانم","المسيلة","معسكر","ورقلة","وهران","البيض","إليزي","برج بوعريريج","بومرداس","الطارف","تندوف","تيسمسيلت","الوادي","خنشلة","سوق أهراس","تيبازة","ميلة","عين الدفلى","النعامة","عين تموشنت","غرداية","غليزان","تيميمون","برج باجي مختار","أولاد جلال","بني عباس","عين صالح","عين قزام","تقرت","جانت","المغير","المنيعة"];
 const LEVELS={"ابتدائية":["التحضيري","1 ابتدائي","2 ابتدائي","3 ابتدائي","4 ابتدائي","5 ابتدائي"],"متوسطة":["1 متوسط","2 متوسط","3 متوسط","4 متوسط"],"ثانوية":["1 ثانوي","2 ثانوي","3 ثانوي"]};
@@ -1164,20 +1203,19 @@ function vSessions(){
 // حصص الجدول التي لم تُسجَّل في اليوم المختار (للتدارك)
 function missedSlots(){
   if(sessDate>todayStr()) return "";
-  const d=new Date(sessDate+"T12:00:00").getDay(), now=hmMin(nowHM());
-  const list=S.timetable.filter(x=>x.day===d&&(!sessClass||x.classId===sessClass)&&cls(x.classId)&&subj(x.subjectId)&&period(x.periodId))
-    .filter(x=>{ const se=getSess("tt_"+x.id+"_"+sessDate); return !(se&&se.savedAt)&&!S.absences.some(a=>a.sessionId==="tt_"+x.id+"_"+sessDate); })
-    .filter(x=>sessDate<todayStr()||hmMin(period(x.periodId).from)<=now)
-    .sort((a,b)=>period(a.periodId).from.localeCompare(period(b.periodId).from)||cls(a.classId).name.localeCompare(cls(b.classId).name,"ar",{numeric:true}));
-  if(!list.length) return "";
-  return `<div class="card"><h2>حصص في الجدول لم تُسجَّل (${list.length})</h2><p class="muted" style="margin-top:0">يمكن تسجيلها الآن إذا نُسيت. ${sessDate<todayStr()?"لن تُرسل رسائل للأولياء إلا إذا اخترت ذلك داخل الحصة.":""}</p>
-    ${list.map(x=>{ const p=period(x.periodId), t=slotTeacher(x); return `<div class="notif" style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
-      <div><b>${esc(subj(x.subjectId).name)}</b> · ${esc(cls(x.classId).name)}<br><span class="muted">${t?esc(t.name):"—"} · ${p.from}–${p.to}</span></div>
-      <button class="btn ghost sm" onclick="startFromSlot('${x.id}','${sessDate}')">تسجيل الغيابات</button></div>`; }).join("")}</div>`;
+  const now=hmMin(nowHM());
+  const list=slotsOn(sessDate,sessClass||undefined).filter(x=>!isSaved(x.sid)&&!S.absences.some(a=>a.sessionId===x.sid)).filter(x=>sessDate<todayStr()||hmMin(x.from)<=now)
+    .sort((a,b)=>a.from.localeCompare(b.from)||cls(a.classId).name.localeCompare(cls(b.classId).name,"ar",{numeric:true}));
+  const k=calOn(sessDate);
+  if(!list.length) return k&&k.type==="holiday"?calBanner(sessDate):"";
+  return `${calBanner(sessDate)}<div class="card"><h2>حصص لم تُسجَّل (${list.length})</h2><p class="muted" style="margin-top:0">يمكن تسجيلها الآن إذا نُسيت. ${sessDate<todayStr()?"لن تُرسل رسائل للأولياء إلا إذا اخترت ذلك داخل الحصة.":""}</p>
+    ${list.map(x=>`<div class="notif" style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+      <div><b>${esc(x.subject)}</b> · ${esc(cls(x.classId).name)}<br><span class="muted">${x.teacher?esc(x.teacher):"—"} · ${x.from}–${x.to}</span></div>
+      <button class="btn ghost sm" onclick="openSlot('${x.key}','${sessDate}')">تسجيل الغيابات</button></div>`).join("")}</div>`;
 }
 function resumeSession(id){
   const x=allSessions().find(z=>z.id===id); if(!x) return;
-  session={id:x.id,slotId:x.slotId,classId:x.classId,subject:x.subject,teacher:x.teacher,date:x.date,from:x.from,to:x.to};
+  session={id:x.id,slotId:x.slotId,examId:x.examId,key:x.key,classId:x.classId,subject:x.subject,teacher:x.teacher,date:x.date,from:x.from,to:x.to};
   if(x.legacy) ensureSession(session);
   lsSet("ghiyab_session",session); openAtt();
 }
@@ -1729,6 +1767,65 @@ function confirmBox(title,msg,fn){
     <div class="row"><button class="btn red" id="cfOk">حذف</button><button class="btn ghost" onclick="closeModal()">إلغاء</button></div></div></div>`;
   document.getElementById("cfOk").onclick=()=>{ closeModal(); fn(); };
 }
+
+/* --- الرزنامة: العطل والاختبارات والتوقيت الخاص --- */
+const HOL_NAMES=["عطلة الخريف","عطلة الشتاء","عطلة الربيع","عيد الثورة (1 نوفمبر)","رأس السنة الميلادية","يناير — رأس السنة الأمازيغية","عيد الفطر","عيد الأضحى","المولد النبوي الشريف","رأس السنة الهجرية","عاشوراء","عيد العمال","عيد الاستقلال","يوم عطلة استثنائي"];
+let calOpen=null;
+function setCal(){
+  const L=(S.cfg.calendar||[]).slice().sort((a,b)=>a.from.localeCompare(b.from));
+  return `<div class="card"><h2>العطل والاختبارات والتوقيت الخاص</h2>
+    <p class="muted" style="margin-top:0">• <b>العطلة:</b> يتوقف الجدول، فلا تظهر حصص ولا تُرسل رسائل.<br>• <b>فترة الاختبارات:</b> يتوقف الجدول العادي ويُستعمل برنامج الاختبارات (المادة، الوقت، الأقسام، الحارس) لتسجيل الغيابات.<br>• <b>التوقيت الخاص</b> (مثل رمضان): نفس الجدول بأوقات حصص مختلفة.</p>
+    <div class="row"><button class="btn" style="flex:0 0 auto" onclick="addCal('holiday')">🏖️ + عطلة</button><button class="btn" style="flex:0 0 auto" onclick="addCal('exam')">📝 + فترة اختبارات</button><button class="btn ghost" style="flex:0 0 auto" onclick="addCal('special')">🕐 + توقيت خاص</button></div></div>
+  <datalist id="holNames">${HOL_NAMES.map(n=>`<option value="${n}">`).join("")}</datalist>
+  ${L.map(e=>{ const days=Math.round((new Date(e.to)-new Date(e.from))/86400000)+1, past=e.to<todayStr(), now=calOn(todayStr())===e;
+    return `<div class="card calrow ${past?"past":""}"><div class="row" style="align-items:end">
+      <span style="flex:0 0 auto;font-size:22px">${CAL_T[e.type][0]}</span>
+      <label class="f" style="margin:0;flex:2 1 180px">${CAL_T[e.type][1]}${now?' <span class="tag ok">جارية الآن</span>':""}<input value="${esc(e.name)}" ${e.type==="holiday"?'list="holNames"':""} onchange="setCalF('${e.id}','name',this.value)"></label>
+      <label class="f" style="margin:0">من<input type="date" value="${e.from}" onchange="setCalF('${e.id}','from',this.value)"></label>
+      <label class="f" style="margin:0">إلى<input type="date" value="${e.to}" onchange="setCalF('${e.id}','to',this.value)"></label>
+      <span class="muted" style="flex:0 0 auto">${days} يوم</span>
+      ${e.type!=="holiday"?`<button class="btn ${calOpen===e.id?"":"ghost"} sm" style="flex:0 0 auto" onclick="calOpen=calOpen==='${e.id}'?null:'${e.id}';render()">${e.type==="exam"?`برنامج الاختبارات (${(S.exams||[]).filter(x=>x.calId===e.id).length})`:"أوقات الحصص"}</button>`:""}
+      <button class="btn ghost sm" style="flex:0 0 auto" onclick="delCal('${e.id}')">حذف</button></div>
+      ${calOpen===e.id?(e.type==="exam"?examEditor(e):specialEditor(e)):""}</div>`; }).join("")||`<div class="card empty">لم تُضف أي عطلة أو فترة اختبارات بعد.</div>`}`;
+}
+function addCal(type){
+  const id=uid(), from=todayStr(), to=addDays(from,type==="holiday"?0:type==="exam"?4:29);
+  const e={id,type,name:type==="holiday"?"عطلة":type==="exam"?"اختبارات الفصل الأول":"توقيت رمضان",from,to};
+  if(type==="special") e.periods=Object.fromEntries((S.cfg.periods||[]).map(p=>[p.id,{from:p.from,to:p.to}]));
+  calOpen=type==="holiday"?null:id; saveCfg({...S.cfg,calendar:[...(S.cfg.calendar||[]),e]});
+}
+function setCalF(id,k,v){ if(!v&&k!=="name") return; saveCfg({...S.cfg,calendar:(S.cfg.calendar||[]).map(e=>e.id===id?{...e,[k]:v}:e)}); }
+function delCal(id){ const e=(S.cfg.calendar||[]).find(x=>x.id===id); confirmBox(`حذف «${esc(e.name)}»؟`,e.type==="exam"?"سيُحذف برنامج الاختبارات معه.":"",()=>{ S.exams=(S.exams||[]).filter(x=>x.calId!==id); saveCfg({...S.cfg,calendar:S.cfg.calendar.filter(x=>x.id!==id)}); }); }
+function examEditor(e){
+  const ex=(S.exams||[]).filter(x=>x.calId===e.id).sort((a,b)=>(a.date+a.from).localeCompare(b.date+b.from));
+  const dates=[]; for(let d=e.from; d<=e.to&&dates.length<40; d=addDays(d,1)) dates.push(d);
+  const levels=[...new Set(S.classes.map(c=>c.level))];
+  const tgt=x=>`<select onchange="setExam('${x.id}','target',this.value)"><option value="all" ${x.target==="all"?"selected":""}>كل الأقسام</option>
+    ${levels.map(l=>`<option value="lv:${esc(l)}" ${x.target==="lv:"+l?"selected":""}>كل أقسام ${esc(l)}</option>`).join("")}
+    <optgroup label="قسم واحد">${S.classes.map(c=>`<option value="cl:${c.id}" ${x.target==="cl:"+c.id?"selected":""}>${esc(c.name)}</option>`).join("")}</optgroup></select>`;
+  return `<div style="overflow-x:auto;margin-top:10px"><table class="extbl"><tr><th>اليوم</th><th>من</th><th>إلى</th><th>المادة</th><th>الأقسام</th><th>الحارس(ة)</th><th></th></tr>
+    ${ex.map(x=>`<tr><td><select onchange="setExam('${x.id}','date',this.value)">${dates.map(d=>`<option value="${d}" ${d===x.date?"selected":""}>${DAY_NAMES[new Date(d+"T12:00:00").getDay()]} ${fmtDate(d).slice(0,5)}</option>`).join("")}</select></td>
+      <td><input type="time" value="${x.from}" onchange="setExam('${x.id}','from',this.value)"></td><td><input type="time" value="${x.to}" onchange="setExam('${x.id}','to',this.value)"></td>
+      <td><select onchange="setExam('${x.id}','subjectId',this.value)">${S.subjects.map(sb=>`<option value="${sb.id}" ${sb.id===x.subjectId?"selected":""}>${esc(sb.name)}</option>`).join("")}</select></td>
+      <td>${tgt(x)}</td><td><input value="${esc(x.supervisor||"")}" list="teachersAll" placeholder="اسم الحارس" onchange="setExam('${x.id}','supervisor',this.value)"></td>
+      <td style="white-space:nowrap"><button class="jbtn" onclick="dupExam('${x.id}')">نسخ</button> <button class="jbtn" onclick="delExam('${x.id}')">✕</button></td></tr>`).join("")}
+    </table></div><datalist id="teachersAll">${S.teachers.map(t=>`<option value="${esc(t.name)}">`).join("")}</datalist>
+    <button class="btn ghost sm" style="margin-top:8px" onclick="addExam('${e.id}')">+ اختبار</button>
+    <p class="muted" style="margin-bottom:0">مثال: يوم الأحد 08:00–10:00 اختبار الرياضيات لكل أقسام 3 ثانوي. يظهر كل اختبار في «الرئيسية» و«دورة الفترة» في وقته لتسجيل الغائبين، وتصل رسالة الولي باسم «اختبار الرياضيات».</p>`;
+}
+function addExam(calId){ const e=S.cfg.calendar.find(x=>x.id===calId); const last=(S.exams||[]).filter(x=>x.calId===calId).slice(-1)[0];
+  S.exams.push({id:uid(),calId,date:last?last.date:e.from,from:last?last.to:"08:00",to:last?addHM(last.to,120):"10:00",subjectId:(S.subjects[0]||{}).id,target:last?last.target:"all",supervisor:""}); saveLocal(); render(); }
+function setExam(id,k,v){ const x=S.exams.find(z=>z.id===id); if(x){ x[k]=v; saveLocal(); render(); } }
+function dupExam(id){ const x=S.exams.find(z=>z.id===id); S.exams.push({...x,id:uid()}); saveLocal(); render(); }
+function delExam(id){ S.exams=S.exams.filter(z=>z.id!==id); saveLocal(); render(); }
+function specialEditor(e){
+  const P=e.periods||{};
+  return `<table style="margin-top:10px"><tr><th>الحصة</th><th>التوقيت العادي</th><th>من</th><th>إلى</th></tr>
+    ${sortedPeriods().map((p,i)=>{ const o=P[p.id]||{from:p.from,to:p.to}; return `<tr><td>${i+1}</td><td class="muted">${p.from}–${p.to}</td>
+      <td><input type="time" value="${o.from}" onchange="setSpecial('${e.id}','${p.id}','from',this.value)"></td><td><input type="time" value="${o.to}" onchange="setSpecial('${e.id}','${p.id}','to',this.value)"></td></tr>`; }).join("")}</table>
+    <p class="muted" style="margin-bottom:0">نفس جدول التوقيت والمواد، بأوقات مختلفة خلال هذه الفترة.</p>`;
+}
+function setSpecial(id,pid,k,v){ saveCfg({...S.cfg,calendar:S.cfg.calendar.map(e=>{ if(e.id!==id) return e; const P={...(e.periods||{})}; const base=period(pid); P[pid]={...(P[pid]||{from:base.from,to:base.to}),[k]:v}; return {...e,periods:P}; })}); }
 
 /* --- إعدادات الفترات وأيام الدراسة --- */
 function periodsCard(){
