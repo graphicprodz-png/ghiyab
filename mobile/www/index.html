@@ -29,6 +29,7 @@ main{max-width:860px;margin:0 auto;padding:14px}
 .card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:14px;margin-bottom:12px}
 .card h2{margin:0 0 10px;font-size:16px}
 .row{display:flex;gap:8px;flex-wrap:wrap}
+html,body{overflow-x:hidden}main{min-width:0}
 .row>*{flex:1 1 140px}
 label.f{display:block;font-size:12.5px;color:var(--muted);margin-bottom:8px}
 label.f input,label.f select,label.f textarea{display:block;width:100%;margin-top:3px}
@@ -106,6 +107,7 @@ td.ltr{direction:ltr;text-align:end}
 .steps .sd{width:26px;height:26px;border-radius:50%;border:2px solid var(--line);display:flex;align-items:center;justify-content:center;flex:0 0 auto;font-weight:700}
 .steps li.ok .sd{background:var(--brand);border-color:var(--brand);color:#fff}.steps li.ok b{color:var(--muted);text-decoration:line-through}
 .steps li.next{background:var(--brand-2)}.steps li.next .sd{border-color:var(--brand)}
+.clshead{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}.clsbtns{display:flex;flex-wrap:wrap;gap:6px}.clsbtns .btn{flex:0 0 auto}
 .licbox{max-width:440px;margin:10px auto 0;text-align:center}
 .devcode{font:700 26px/1.3 ui-monospace,Menlo,Consolas,monospace;letter-spacing:2px;color:var(--brand);background:var(--brand-2);border:1px dashed var(--brand);border-radius:12px;padding:10px;margin:6px 0 10px}
 .licbox textarea{width:100%;font-family:ui-monospace,monospace;font-size:13px}
@@ -963,8 +965,8 @@ function vStudents(){
       <button class="btn ghost" style="flex:0 0 auto" onclick="templateXlsx()">نموذج ملف فارغ</button>
     </div></div>
   ${flashHTML()}
-  ${c?`<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><h2 style="margin:0">${esc(c.name)} — ${list.length} تلميذ</h2>
-      <span class="row" style="flex:0 0 auto;gap:6px"><button class="btn ghost sm" onclick="renumberDlg('${c.id}')">🔢 ترقيم التلاميذ</button><button class="btn ghost sm" onclick="openConsent('${c.id}')">🖨️ استمارات موافقة الأولياء</button><button class="btn red sm" onclick="askDelClass('${c.id}')">حذف القسم</button></span></div>
+  ${c?`<div class="card"><div class="clshead"><h2 style="margin:0">${esc(c.name)} — ${list.length} تلميذ</h2>
+      <div class="clsbtns"><button class="btn ghost sm" onclick="renumberDlg('${c.id}')">🔢 ترقيم التلاميذ</button><button class="btn ghost sm" onclick="openConsent('${c.id}')">🖨️ استمارات موافقة الأولياء</button><button class="btn red sm" onclick="askDelClass('${c.id}')">حذف القسم</button></div></div>
     <div class="row" style="align-items:end;margin-top:10px">
       <label class="f" style="margin:0">اسم التلميذ(ة)<input id="aName"></label>
       <label class="f" style="margin:0;max-width:150px">الرقم (اختياري)<input id="aCode" style="direction:ltr" placeholder="تلقائي"></label>
