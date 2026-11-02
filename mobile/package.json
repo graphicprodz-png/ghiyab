@@ -1,0 +1,15 @@
+{
+  "name": "ghiyab-mobile",
+  "version": "1.0.0",
+  "private": true,
+  "description": "تطبيق غياب للطابليت (أندرويد) مع إرسال SMS آلي من الشريحة",
+  "dependencies": {
+    "@capacitor/android": "^7.0.0",
+    "@capacitor/core": "^7.0.0",
+    "ghiyab-sms-sender": "file:./plugins/sms-sender"
+  },
+  "devDependencies": {
+    "@capacitor/assets": "^3.0.5",
+    "@capacitor/cli": "^7.0.0"
+  }
+}

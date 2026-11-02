@@ -1,0 +1,629 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>غياب — إعلام الأولياء بغياب التلاميذ</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet">
+<script src="capacitor.js"></script>
+<style>
+:root{
+  --bg:#f4f6f5;--card:#fff;--ink:#14231c;--muted:#5d6e66;--line:#dfe6e2;
+  --brand:#0f6b4f;--brand-2:#e8f3ee;--red:#c0392b;--red-2:#fbeceA;--amber:#b7791f;--amber-2:#fdf3e1;
+  --wa:#1f9d55;--r:14px;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font-family:"Cairo",system-ui,sans-serif;font-size:15px}
+button,input,select,textarea{font:inherit;color:inherit}
+header{background:var(--brand);color:#fff;padding:14px 16px 0;position:sticky;top:0;z-index:5}
+header h1{margin:0;font-size:19px;font-weight:800;display:flex;align-items:center;gap:8px}
+header .sub{font-size:12.5px;opacity:.85;margin-top:2px}
+nav{display:flex;gap:4px;overflow-x:auto;margin-top:10px;scrollbar-width:none}
+nav::-webkit-scrollbar{display:none}
+nav button{background:none;border:0;color:#fff;opacity:.75;padding:10px 12px;border-bottom:3px solid transparent;white-space:nowrap;cursor:pointer;font-weight:600}
+nav button.on{opacity:1;border-color:#fff}
+nav .badge{background:#fff;color:var(--brand);border-radius:99px;padding:0 7px;font-size:12px;margin-inline-start:4px}
+main{max-width:860px;margin:0 auto;padding:14px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:14px;margin-bottom:12px}
+.card h2{margin:0 0 10px;font-size:16px}
+.row{display:flex;gap:8px;flex-wrap:wrap}
+.row>*{flex:1 1 140px}
+label.f{display:block;font-size:12.5px;color:var(--muted);margin-bottom:8px}
+label.f input,label.f select,label.f textarea{display:block;width:100%;margin-top:3px}
+input,select,textarea{border:1px solid var(--line);border-radius:10px;padding:9px 10px;background:#fff}
+textarea{min-height:90px;resize:vertical}
+input:focus,select:focus,textarea:focus{outline:2px solid var(--brand);outline-offset:-1px}
+.btn{border:0;border-radius:10px;padding:9px 14px;font-weight:700;cursor:pointer;background:var(--brand);color:#fff;display:inline-flex;align-items:center;gap:6px;justify-content:center;text-decoration:none}
+.btn.ghost{background:var(--brand-2);color:var(--brand)}
+.btn.red{background:var(--red)}
+.btn.wa{background:var(--wa)}
+.btn.sm{padding:6px 10px;font-size:13px}
+.btn:disabled{opacity:.5;cursor:default}
+.muted{color:var(--muted);font-size:13px}
+.empty{text-align:center;padding:26px 10px;color:var(--muted)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+.stu{border:1.5px solid var(--line);border-radius:12px;padding:10px;background:#fff;cursor:pointer;text-align:start;display:flex;flex-direction:column;gap:2px;transition:.12s}
+.stu .n{font-weight:700}
+.stu .c{font-size:12px;color:var(--muted);direction:ltr;text-align:end}
+.stu.abs{border-color:var(--red);background:var(--red-2)}
+.stu.abs .n{color:var(--red)}
+.stu.locked{cursor:default}
+.tag{display:inline-block;font-size:11.5px;font-weight:700;border-radius:99px;padding:1px 8px}
+.tag.red{background:var(--red-2);color:var(--red)}
+.tag.amb{background:var(--amber-2);color:var(--amber)}
+.tag.ok{background:var(--brand-2);color:var(--brand)}
+.scan{display:flex;gap:8px;align-items:center;background:var(--brand-2);border-radius:12px;padding:10px;margin-bottom:10px;flex-wrap:wrap}
+.scan input{flex:1 1 180px;direction:ltr;text-align:center;font-weight:700;letter-spacing:2px}
+.flash{padding:8px 12px;border-radius:10px;margin-bottom:10px;font-weight:600;font-size:14px}
+.flash.ok{background:var(--brand-2);color:var(--brand)}
+.flash.err{background:var(--red-2);color:var(--red)}
+.notif{border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:8px;background:#fff}
+.notif .top{display:flex;justify-content:space-between;gap:8px;align-items:flex-start}
+.notif .msg{background:#f2f7f4;border-radius:10px;padding:9px 11px;font-size:13.5px;margin:8px 0;white-space:pre-wrap;line-height:1.7}
+.notif .act{display:flex;gap:6px;flex-wrap:wrap}
+.cd{font-variant-numeric:tabular-nums;direction:ltr;display:inline-block}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px}
+.stat{background:#fff;border:1px solid var(--line);border-radius:12px;padding:10px;text-align:center}
+.stat b{display:block;font-size:22px}
+.stat span{font-size:12px;color:var(--muted)}
+table{width:100%;border-collapse:collapse;font-size:14px}
+td,th{padding:8px 6px;border-bottom:1px solid var(--line);text-align:start}
+th{font-size:12.5px;color:var(--muted);font-weight:600}
+td.ltr{direction:ltr;text-align:end}
+.labels{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px}
+.label{border:1px dashed #9aa9a2;border-radius:8px;padding:8px;background:#fff;text-align:center;break-inside:avoid}
+.label .ln{font-weight:700;font-size:14px}
+.label .lc{font-size:11.5px;color:var(--muted)}
+.label svg{width:100%;height:54px;display:block;margin:4px 0 0}
+.label .code{direction:ltr;font-weight:700;letter-spacing:3px;font-size:13px}
+.pill{display:inline-flex;gap:6px;align-items:center;font-size:12px;background:rgba(255,255,255,.18);border-radius:99px;padding:2px 9px;margin-top:6px}
+.dot{width:7px;height:7px;border-radius:50%;background:#ffd166}
+.dot.live{background:#7CFFB2}
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;z-index:20;padding:16px}
+.dialog{background:#fff;border-radius:16px;padding:16px;max-width:420px;width:100%}
+.hide{display:none!important}
+.banner{border-radius:12px;padding:10px 12px;margin-bottom:12px;font-size:13.5px}
+.banner.ok{background:var(--brand-2);color:var(--brand)}
+.banner.amb{background:var(--amber-2);color:var(--amber)}
+.switch{display:flex;align-items:center;gap:10px;font-weight:600;margin-bottom:10px}
+.switch input{width:22px;height:22px;accent-color:var(--brand)}
+@media print{header,.noprint{display:none!important}main{padding:0}.card{border:0}}
+</style>
+</head>
+<body>
+<header>
+  <h1>📋 <span id="schoolTitle">غياب</span></h1>
+  <div class="sub">تسجيل غياب التلاميذ وإعلام الأولياء آلياً عبر SMS</div>
+    <nav id="nav">
+    <button data-v="session" class="on">تسجيل الغياب</button>
+    <button data-v="notifs">الإشعارات <span class="badge hide" id="dueBadge">0</span></button>
+    <button data-v="students">الأقسام والتلاميذ</button>
+    <button data-v="labels">ملصقات الكودبار</button>
+    <button data-v="settings">الإعدادات</button>
+  </nav>
+</header>
+<main id="main"></main>
+<div id="modal"></div>
+
+<script>
+/* ============ Data layer: shared db when available, otherwise this browser ============ */
+const DEFAULT_CFG={
+  school:"ثانوية النموذجية",
+  autoSms:true,
+  delayMin:15,
+  cc:"213",
+  template:"{المؤسسة}: ابنكم {الاسم} ({القسم}) غائب عن حصة {المادة} يوم {التاريخ} من {من} إلى {إلى}."
+};
+const S={classes:[],students:[],absences:[],cfg:{...DEFAULT_CFG}};
+const DB=null;
+const LS_KEY="ghiyab_v1";
+function lsGet(k){try{return JSON.parse(localStorage.getItem(k))}catch(e){return null}}
+function lsSet(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}
+function saveLocal(){ if(!DB) lsSet(LS_KEY,{classes:S.classes,students:S.students,absences:S.absences,cfg:S.cfg}); }
+(function loadLocal(){const d=lsGet(LS_KEY); if(d){Object.assign(S,d); S.cfg={...DEFAULT_CFG,...(d.cfg||{})};}})();
+
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
+const strip=o=>{const c={...o};delete c.id;return c};
+
+async function put(col,obj){
+  if(DB){ try{ await DB.collection(col).doc(obj.id).set(strip(obj)); }catch(e){ toast("تعذّر الحفظ: "+(e.message||e.code),true) } return; }
+  const arr=S[col]; const i=arr.findIndex(x=>x.id===obj.id);
+  if(i>=0) arr[i]=obj; else arr.push(obj);
+  saveLocal(); render();
+}
+async function del(col,id){
+  if(DB){ try{ await DB.collection(col).doc(id).delete(); }catch(e){ toast("تعذّر الحذف",true) } return; }
+  S[col]=S[col].filter(x=>x.id!==id); saveLocal(); render();
+}
+async function saveCfg(cfg){
+  S.cfg=cfg;
+  if(DB){ try{ await DB.doc("config/main").set(cfg);}catch(e){toast("تعذّر حفظ الإعدادات",true)} }
+  else { saveLocal(); }
+  render();
+}
+
+/* ============ Native (APK) ============ */
+const IS_APP=!!(window.Capacitor&&window.Capacitor.isNativePlatform&&window.Capacitor.isNativePlatform());
+let _sms=null;
+function smsPlugin(){
+  if(!IS_APP) return null;
+  if(_sms) return _sms;
+  const C=window.Capacitor;
+  _sms=(typeof C.registerPlugin==="function"?C.registerPlugin("SmsSender"):null)||(C.Plugins&&C.Plugins.SmsSender)||null;
+  return _sms;
+}
+const autoOn=()=>IS_APP&&!!S.cfg.autoSms&&!!smsPlugin();
+
+/* ============ Helpers ============ */
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const todayStr=()=>{const d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")};
+const nowHM=()=>{const d=new Date();return String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0")};
+const addHM=(hm,min)=>{const[h,m]=hm.split(":").map(Number);const t=h*60+m+min;return String(Math.floor(t/60)%24).padStart(2,"0")+":"+String(t%60).padStart(2,"0")};
+const fmtDate=s=>{try{const[y,m,d]=s.split("-");return d+"/"+m+"/"+y}catch(e){return s}};
+const cls=id=>S.classes.find(c=>c.id===id);
+const stuByCode=code=>S.students.find(s=>s.code===String(code).trim());
+function intlPhone(p){
+  let d=String(p||"").replace(/[^\d+]/g,"");
+  if(d.startsWith("+")) return d.slice(1);
+  if(d.startsWith("00")) return d.slice(2);
+  if(d.startsWith("0")) return (S.cfg.cc||"213")+d.slice(1);
+  return d;
+}
+function nextCode(){
+  const yy=String(new Date().getFullYear()).slice(2);
+  let max=0; S.students.forEach(s=>{ if(s.code&&s.code.startsWith(yy)){const n=parseInt(s.code.slice(2),10); if(n>max) max=n;} });
+  return yy+String(max+1).padStart(4,"0");
+}
+function message(a){
+  const st=S.students.find(s=>s.id===a.studentId)||{name:a.studentName,code:a.code};
+  const c=cls(a.classId);
+  return (S.cfg.template||"")
+    .replaceAll("{الاسم}",st.name||a.studentName||"")
+    .replaceAll("{الرقم}",st.code||a.code||"")
+    .replaceAll("{القسم}",c?c.name:(a.className||""))
+    .replaceAll("{المادة}",a.subject||"")
+    .replaceAll("{الأستاذ}",a.teacher||"")
+    .replaceAll("{التاريخ}",fmtDate(a.date))
+    .replaceAll("{من}",a.from||"")
+    .replaceAll("{إلى}",a.to||"")
+    .replaceAll("{المؤسسة}",S.cfg.school||"");
+}
+
+/* ============ Code 39 barcode (SVG) ============ */
+const C39={"0":"nnnwwnwnn","1":"wnnwnnnnw","2":"nnwwnnnnw","3":"wnwwnnnnn","4":"nnnwwnnnw","5":"wnnwwnnnn","6":"nnwwwnnnn","7":"nnnwnnwnw","8":"wnnwnnwnn","9":"nnwwnnwnn","*":"nwnnwnwnn"};
+function barcodeSVG(code){
+  const chars=("*"+code+"*").split(""); let x=10; const N=2,W=5,H=60; let rects="";
+  chars.forEach((ch,ci)=>{
+    const p=C39[ch]; if(!p) return;
+    for(let i=0;i<9;i++){ const w=p[i]==="w"?W:N; if(i%2===0) rects+=`<rect x="${x}" y="0" width="${w}" height="${H}"/>`; x+=w; }
+    if(ci<chars.length-1) x+=N;
+  });
+  return `<svg viewBox="0 0 ${x+10} ${H}" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg"><rect width="100%" height="100%" fill="#fff"/><g fill="#000">${rects}</g></svg>`;
+}
+
+/* ============ UI state ============ */
+let view=(location.hash||"").slice(1)||"session";
+if(!["session","notifs","students","labels","settings"].includes(view)) view="session";
+let session=lsGet("ghiyab_session");           // current class session on this device
+let selClass=lsGet("ghiyab_selClass")||null;   // selected class in students view
+let labelClass=null, notifDate=todayStr(), flashMsg=null;
+
+function toast(msg,err){ flashMsg={msg,err}; render(); setTimeout(()=>{ if(flashMsg&&flashMsg.msg===msg){flashMsg=null;render()} },3500); }
+function flashHTML(){ return flashMsg?`<div class="flash ${flashMsg.err?"err":"ok"}">${esc(flashMsg.msg)}</div>`:"" }
+
+document.getElementById("nav").addEventListener("click",e=>{
+  const b=e.target.closest("button[data-v]"); if(!b) return;
+  view=b.dataset.v; flashMsg=null; try{history.replaceState(null,"","#"+view)}catch(_){ } render(); window.scrollTo(0,0);
+});
+window.addEventListener("hashchange",()=>{const v=location.hash.slice(1); if(v&&v!==view){view=v;render()}});
+
+/* ============ Views ============ */
+function render(){
+  document.querySelectorAll("nav button").forEach(b=>b.classList.toggle("on",b.dataset.v===view));
+  document.getElementById("schoolTitle").textContent=S.cfg.school||"غياب";
+  updateBadge();
+  const m=document.getElementById("main");
+  const active=document.activeElement&&document.activeElement.id;
+  setTimeout(()=>{ if(view==="settings") smsCount(); },0);
+  m.innerHTML=({session:vSession,notifs:vNotifs,students:vStudents,labels:vLabels,settings:vSettings}[view]||vSession)();
+  if(active==="scanInput"){ const s=document.getElementById("scanInput"); if(s) s.focus(); }
+}
+
+function needAction(){ const t=Date.now(); return S.absences.filter(a=>a.status==="failed"||(!autoOn()&&a.status==="waiting"&&a.notifyAt<=t)); }
+function updateBadge(){ const n=needAction().length; const bd=document.getElementById("dueBadge"); bd.textContent=n; bd.classList.toggle("hide",!n); }
+function emptyData(){
+  return `<div class="card empty">
+    <div style="font-size:34px">🏫</div>
+    <p>لا توجد أقسام ولا تلاميذ بعد.</p>
+    <div class="row" style="justify-content:center;max-width:420px;margin:auto">
+      <button class="btn" onclick="seedDemo()">إضافة بيانات تجريبية (قسم 2 ثانوية، 25 تلميذاً)</button>
+      <button class="btn ghost" onclick="view='students';render()">إضافة الأقسام يدوياً</button>
+    </div></div>`;
+}
+
+/* --- Session / attendance --- */
+function vSession(){
+  if(!S.classes.length) return emptyData();
+  if(!session){
+    const t=nowHM();
+    return `<div class="card"><h2>بدء حصة جديدة</h2>
+      <label class="f">القسم<select id="sClass">${S.classes.map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join("")}</select></label>
+      <div class="row">
+        <label class="f">المادة<input id="sSubject" placeholder="مثال: الرياضيات" list="subjects"></label>
+        <label class="f">الأستاذ(ة)<input id="sTeacher" placeholder="مثال: محمد بوعلام"></label>
+      </div>
+      <datalist id="subjects">${["الرياضيات","اللغة العربية","الفيزياء","العلوم الطبيعية","اللغة الفرنسية","اللغة الإنجليزية","التاريخ والجغرافيا","الفلسفة","التربية الإسلامية","الإعلام الآلي"].map(s=>`<option value="${s}">`).join("")}</datalist>
+      <div class="row">
+        <label class="f">التاريخ<input type="date" id="sDate" value="${todayStr()}"></label>
+        <label class="f">من الساعة<input type="time" id="sFrom" value="${t}"></label>
+        <label class="f">إلى الساعة<input type="time" id="sTo" value="${addHM(t,60)}"></label>
+      </div>
+      <button class="btn" onclick="startSession()" style="width:100%;margin-top:4px">بدء تسجيل الغياب</button>
+    </div>
+    ${recentSessions()}`;
+  }
+  const c=cls(session.classId);
+  const list=S.students.filter(s=>s.classId===session.classId).sort((a,b)=>a.name.localeCompare(b.name,"ar"));
+  const absMap={}; S.absences.filter(a=>a.sessionId===session.id).forEach(a=>absMap[a.studentId]=a);
+  const nAbs=Object.keys(absMap).length;
+  return `<div class="card">
+    <div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start;flex-wrap:wrap">
+      <div><h2 style="margin:0">${esc(session.subject)} — ${esc(c?c.name:"")}</h2>
+      <div class="muted">الأستاذ(ة) ${esc(session.teacher)} · ${fmtDate(session.date)} · من ${session.from} إلى ${session.to}</div></div>
+      <button class="btn ghost sm" onclick="endSession()">إنهاء الحصة</button>
+    </div></div>
+    <div class="stats">
+      <div class="stat"><b>${list.length}</b><span>عدد التلاميذ</span></div>
+      <div class="stat"><b style="color:var(--brand)">${list.length-nAbs}</b><span>حاضر</span></div>
+      <div class="stat"><b style="color:var(--red)">${nAbs}</b><span>غائب</span></div>
+    </div>
+    <div class="scan">
+      <span>🔎</span>
+      <input id="scanInput" inputmode="numeric" placeholder="امسح الكودبار أو اكتب رقم التلميذ" onkeydown="if(event.key==='Enter'){scanCode(this.value);this.value=''}">
+      <label class="btn ghost sm" style="flex:0 0 auto">📷 صورة<input type="file" accept="image/*" capture="environment" class="hide" onchange="scanImage(this)"></label>
+    </div>
+    ${flashHTML()}
+    <p class="muted" style="margin:0 0 8px">اضغط على اسم التلميذ الغائب لتسجيل غيابه، أو اضغط مرة أخرى لإلغائه (قبل إرسال الإشعار).</p>
+    ${list.length?`<div class="grid">${list.map(s=>{const a=absMap[s.id];const sent=a&&a.status==="sent";
+      return `<button class="stu ${a?"abs":""} ${sent?"locked":""}" onclick="toggleAbs('${s.id}')">
+        <span class="n">${esc(s.name)}</span><span class="c">${esc(s.code)}</span>
+        ${a?`<span class="tag ${sent?"ok":"red"}">${sent?"غائب · أُعلم الولي":"غائب"}</span>`:""}
+      </button>`}).join("")}</div>`:`<div class="empty">لا يوجد تلاميذ في هذا القسم.</div>`}`;
+}
+function recentSessions(){
+  const seen={}; const rows=[];
+  S.absences.slice().sort((a,b)=>b.createdAt-a.createdAt).forEach(a=>{
+    if(!seen[a.sessionId]){seen[a.sessionId]={a,n:0};rows.push(seen[a.sessionId])} seen[a.sessionId].n++;
+  });
+  if(!rows.length) return "";
+  return `<div class="card"><h2>آخر الحصص المسجّلة</h2><table><tr><th>الحصة</th><th>القسم</th><th>التاريخ</th><th>الغيابات</th></tr>
+    ${rows.slice(0,8).map(r=>`<tr><td>${esc(r.a.subject)}</td><td>${esc((cls(r.a.classId)||{}).name||r.a.className||"")}</td><td>${fmtDate(r.a.date)} ${r.a.from}</td><td><span class="tag red">${r.n}</span></td></tr>`).join("")}
+  </table></div>`;
+}
+function startSession(){
+  const g=id=>document.getElementById(id).value.trim();
+  if(!g("sSubject")||!g("sTeacher")) return toast("أدخل المادة واسم الأستاذ",true);
+  session={id:uid(),classId:g("sClass"),subject:g("sSubject"),teacher:g("sTeacher"),date:g("sDate"),from:g("sFrom"),to:g("sTo")};
+  lsSet("ghiyab_session",session); flashMsg=null; render();
+  setTimeout(()=>{const s=document.getElementById("scanInput"); if(s) s.focus()},50);
+}
+function endSession(){ session=null; lsSet("ghiyab_session",null); flashMsg=null; render(); }
+function toggleAbs(studentId){
+  const id=session.id+"_"+studentId;
+  const ex=S.absences.find(a=>a.id===id);
+  if(ex){ if(ex.status==="sent") return toast("أُرسل الإشعار للولي، لا يمكن إلغاء هذا الغياب",true); del("absences",id); return; }
+  const st=S.students.find(s=>s.id===studentId); const c=cls(session.classId);
+  const now=Date.now();
+  put("absences",{id,sessionId:session.id,studentId,studentName:st.name,code:st.code,classId:session.classId,className:c?c.name:"",
+    subject:session.subject,teacher:session.teacher,date:session.date,from:session.from,to:session.to,
+    createdAt:now,notifyAt:now+(Number(S.cfg.delayMin)||0)*60000,status:"waiting"});
+}
+function scanCode(v){
+  v=String(v||"").replace(/\*/g,"").trim(); if(!v) return;
+  const st=stuByCode(v);
+  if(!st) return toast("الرقم "+v+" غير موجود",true);
+  if(st.classId!==session.classId) return toast(st.name+" ليس من هذا القسم",true);
+  const id=session.id+"_"+st.id;
+  if(S.absences.find(a=>a.id===id)) return toast(st.name+" مسجّل غائباً من قبل",false);
+  toggleAbs(st.id); toast("✓ سُجّل غياب "+st.name);
+}
+async function scanImage(inp){
+  const f=inp.files&&inp.files[0]; inp.value=""; if(!f) return;
+  if(!("BarcodeDetector" in window)) return toast("هذا المتصفح لا يقرأ الكودبار من الصور. استعمل قارئ كودبار أو اكتب الرقم.",true);
+  try{
+    const bmp=await createImageBitmap(f);
+    const det=new BarcodeDetector({formats:["code_39","code_128","qr_code"]});
+    const r=await det.detect(bmp);
+    if(!r.length) return toast("لم يُعثر على كودبار في الصورة",true);
+    r.forEach(x=>scanCode(x.rawValue));
+  }catch(e){ toast("تعذّرت قراءة الصورة",true) }
+}
+
+/* --- Notifications --- */
+function vNotifs(){
+  const all=S.absences.filter(a=>a.date===notifDate).sort((a,b)=>a.notifyAt-b.notifyAt);
+  const t=Date.now(), auto=autoOn();
+  const act=needAction().filter(a=>a.date===notifDate);
+  const wait=all.filter(a=>(a.status==="waiting"||a.status==="sending")&&!act.includes(a));
+  const sent=all.filter(a=>a.status==="sent");
+  const card=(a,kind)=>{
+    const st=S.students.find(s=>s.id===a.studentId)||{};
+    const phone=intlPhone(st.phone); const msg=message(a);
+    const tag=kind==="act"?(a.status==="failed"?`<span class="tag red">لم يُرسل</span>`:`<span class="tag red">جاهز للإرسال</span>`)
+      :kind==="wait"?(a.status==="sending"?`<span class="tag amb">جارِ الإرسال…</span>`:`<span class="tag amb">${auto?"يُرسل آلياً بعد":"جاهز بعد"} <span class="cd" data-cd="${a.notifyAt}">${cdText(a.notifyAt)}</span></span>`)
+      :`<span class="tag ok">أُرسل</span>`;
+    const manual=phone?`<a class="btn sm" href="sms:+${phone}?body=${encodeURIComponent(msg)}" onclick="markSent('${a.id}','sms')">SMS يدوي</a>
+        <a class="btn wa sm" href="https://wa.me/${phone}?text=${encodeURIComponent(msg)}" ${IS_APP?"":'target="_blank" rel="noopener"'} onclick="markSent('${a.id}','whatsapp')">واتساب</a>`
+      :`<span class="muted">أضف رقم الولي في «الأقسام والتلاميذ».</span>`;
+    return `<div class="notif">
+      <div class="top"><div><b>${esc(a.studentName)}</b> <span class="muted">· ${esc(a.subject)} · ${a.from}–${a.to}</span><br>
+        <span class="muted">الولي: ${esc(st.parent||"—")} · <span style="direction:ltr;display:inline-block">${esc(st.phone||"لا يوجد رقم")}</span></span></div>${tag}</div>
+      ${kind!=="sent"?`<div class="msg">${esc(msg)}</div>`:""}
+      ${a.status==="failed"&&a.lastError?`<div class="flash err" style="font-size:12.5px">${esc(a.lastError)}</div>`:""}
+      <div class="act">
+        ${kind==="act"?manual:""}
+        ${kind==="act"&&a.status==="failed"&&auto&&phone?`<button class="btn ghost sm" onclick="sendNow('${a.id}')">إعادة المحاولة</button>`:""}
+        ${kind==="wait"&&a.status==="waiting"?`<button class="btn ghost sm" onclick="sendNow('${a.id}')">${auto?"أرسل الآن":"جاهز الآن"}</button>`:""}
+        ${kind!=="sent"&&a.status!=="sending"?`<button class="btn ghost sm" onclick="markSent('${a.id}','manual')">أُعلم الولي بطريقة أخرى</button>`:""}
+        ${kind==="sent"?`<span class="muted">عبر ${({sms:"SMS",whatsapp:"واتساب",manual:"وسيلة أخرى"})[a.channel]||""} · ${a.sentAt?new Date(a.sentAt).toLocaleTimeString("ar-DZ",{hour:"2-digit",minute:"2-digit"}):""}</span>`:""}
+      </div></div>`;
+  };
+  return `<div class="card noprint"><div class="row" style="align-items:end">
+      <label class="f" style="margin:0">اليوم<input type="date" value="${notifDate}" onchange="notifDate=this.value;render()"></label>
+      <div class="muted" style="flex:2 1 220px">يُرسل إشعار كل غياب بعد <b>${S.cfg.delayMin}</b> دقيقة من تسجيله (تُغيَّر في الإعدادات).</div>
+    </div></div>
+    <div class="banner ${auto?"ok":"amb"}">${auto?"✓ الإرسال الآلي عبر SMS مفعّل من شريحة هذا الجهاز. اترك التطبيق مفتوحاً أثناء الدوام."
+      :IS_APP?"الإرسال الآلي متوقف — فعّله من «الإعدادات»، أو أرسل يدوياً عند حلول الموعد."
+      :"هذه نسخة المتصفح: الإرسال الآلي يعمل فقط في تطبيق الطابليت (APK). هنا تُرسل الرسائل يدوياً."}</div>
+    <div class="stats">
+      <div class="stat"><b style="color:var(--red)">${act.length}</b><span>يحتاج إجراء</span></div>
+      <div class="stat"><b style="color:var(--amber)">${wait.length}</b><span>في الانتظار</span></div>
+      <div class="stat"><b style="color:var(--brand)">${sent.length}</b><span>أُرسل</span></div>
+    </div>
+    ${flashHTML()}
+    ${!all.length?`<div class="card empty">لا توجد غيابات مسجّلة في هذا اليوم.</div>`:""}
+    ${act.length?`<h3 style="margin:6px 2px">يحتاج إجراء</h3>${act.map(a=>card(a,"act")).join("")}`:""}
+    ${wait.length?`<h3 style="margin:6px 2px">في الانتظار</h3>${wait.map(a=>card(a,"wait")).join("")}`:""}
+    ${sent.length?`<h3 style="margin:6px 2px">أُرسلت</h3>${sent.map(a=>card(a,"sent")).join("")}`:""}`;
+}
+function cdText(at){ const left=Math.max(0,Number(at)-Date.now()); return Math.floor(left/60000)+":"+String(Math.floor(left%60000/1000)).padStart(2,"0"); }
+function markSent(id,channel){ const a=S.absences.find(x=>x.id===id); if(a) put("absences",{...a,status:"sent",channel,sentAt:Date.now()}); }
+function sendNow(id){ const a=S.absences.find(x=>x.id===id); if(a) put("absences",{...a,notifyAt:Date.now(),...(a.status==="failed"?{status:"waiting",attempts:0,lastError:""}:{})}); }
+
+/* --- Automatic SMS from the device SIM --- */
+let sending=false;
+async function autoSendTick(){
+  if(sending||!autoOn()) return;
+  const due=S.absences.filter(a=>a.status==="waiting"&&a.notifyAt<=Date.now()&&(a.attempts||0)<3);
+  if(!due.length) return;
+  sending=true;
+  try{
+    for(const a of due){
+      const st=S.students.find(s=>s.id===a.studentId)||{};
+      const phone=intlPhone(st.phone);
+      if(!phone){ await put("absences",{...a,status:"failed",lastError:"لا يوجد رقم هاتف للولي"}); continue; }
+      try{
+        await smsPlugin().send({phone:"+"+phone,message:message(a)});
+        await put("absences",{...a,status:"sent",channel:"sms",sentAt:Date.now(),attempts:(a.attempts||0)+1,lastError:""});
+      }catch(e){
+        const n=(a.attempts||0)+1;
+        await put("absences",{...a,attempts:n,status:n>=3?"failed":"waiting",lastError:String((e&&e.message)||e).slice(0,300),notifyAt:Date.now()+120000});
+      }
+    }
+  }finally{ sending=false; }
+}
+setInterval(()=>autoSendTick().catch(()=>{}),5000);
+document.addEventListener("visibilitychange",()=>{ if(!document.hidden) autoSendTick().catch(()=>{}); });
+
+/* --- Classes & students --- */
+function vStudents(){
+  if(selClass&&!cls(selClass)) selClass=null;
+  const c=selClass?cls(selClass):null;
+  const list=c?S.students.filter(s=>s.classId===c.id).sort((a,b)=>a.name.localeCompare(b.name,"ar")):[];
+  return `<div class="card"><h2>الأقسام</h2>
+    ${S.classes.length?`<div class="row" style="margin-bottom:10px">${S.classes.slice().sort((a,b)=>a.name.localeCompare(b.name,"ar")).map(k=>`<button class="btn ${k.id===selClass?"":"ghost"} sm" style="flex:0 0 auto" onclick="pickClass('${k.id}')">${esc(k.name)} <span style="opacity:.7">(${S.students.filter(s=>s.classId===k.id).length})</span></button>`).join("")}</div>`:`<p class="muted">لا توجد أقسام بعد.</p>`}
+    <div class="row" style="align-items:end">
+      <label class="f" style="margin:0">المستوى<select id="nLevel">${["1 متوسط","2 متوسط","3 متوسط","4 متوسط","1 ثانوي","2 ثانوي","3 ثانوي"].map(l=>`<option>${l}</option>`).join("")}</select></label>
+      <label class="f" style="margin:0">رقم/اسم الفوج<input id="nGroup" placeholder="مثال: علوم تجريبية 1"></label>
+      <button class="btn" style="flex:0 0 auto" onclick="addClass()">+ قسم</button>
+    </div>
+    ${!S.classes.length?`<div style="margin-top:10px"><button class="btn ghost" onclick="seedDemo()">أو أضف بيانات تجريبية</button></div>`:""}
+  </div>
+  ${flashHTML()}
+  ${c?`<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><h2 style="margin:0">${esc(c.name)} — ${list.length} تلميذ</h2>
+      <button class="btn red sm" onclick="askDelClass('${c.id}')">حذف القسم</button></div>
+    <div class="row" style="align-items:end;margin-top:10px">
+      <label class="f" style="margin:0">اسم التلميذ(ة)<input id="aName"></label>
+      <label class="f" style="margin:0">اسم الولي<input id="aParent"></label>
+      <label class="f" style="margin:0">هاتف الولي<input id="aPhone" inputmode="tel" placeholder="0550 12 34 56" style="direction:ltr"></label>
+      <button class="btn" style="flex:0 0 auto" onclick="addStudent()">+ تلميذ</button>
+    </div>
+    <details style="margin-top:10px"><summary class="muted" style="cursor:pointer">إضافة قائمة كاملة دفعة واحدة</summary>
+      <p class="muted">سطر لكل تلميذ: الاسم، اسم الولي، الهاتف (مفصولة بفاصلة). يمكن النسخ من Excel.</p>
+      <textarea id="bulk" placeholder="عبد الله سلطان، سلطان رشيد، 0550123456"></textarea>
+      <button class="btn ghost" onclick="bulkAdd()">إضافة القائمة</button>
+    </details>
+    ${list.length?`<table style="margin-top:10px"><tr><th>الرقم</th><th>الاسم</th><th>الولي</th><th>الهاتف</th><th></th></tr>
+      ${list.map(s=>`<tr><td class="ltr" style="text-align:start">${esc(s.code)}</td><td>${esc(s.name)}</td><td>${esc(s.parent||"")}</td><td class="ltr">${esc(s.phone||"")}</td>
+      <td style="white-space:nowrap"><button class="btn ghost sm" onclick="editStudent('${s.id}')">تعديل</button></td></tr>`).join("")}</table>`:`<div class="empty">أضف تلاميذ هذا القسم. يتولد رقم وكودبار كل تلميذ تلقائياً.</div>`}
+  </div>`:(S.classes.length?`<div class="card empty">اختر قسماً لعرض تلاميذه.</div>`:"")}`;
+}
+function pickClass(id){ selClass=id; lsSet("ghiyab_selClass",id); render(); }
+function addClass(){
+  const lv=document.getElementById("nLevel").value, g=document.getElementById("nGroup").value.trim();
+  const id=uid(); put("classes",{id,level:lv,name:lv+(g?" — "+g:"")}); selClass=id; lsSet("ghiyab_selClass",id);
+}
+function addStudent(){
+  const name=document.getElementById("aName").value.trim(); if(!name) return toast("أدخل اسم التلميذ",true);
+  put("students",{id:uid(),code:nextCode(),name,parent:document.getElementById("aParent").value.trim(),phone:document.getElementById("aPhone").value.trim(),classId:selClass});
+  toast("أُضيف "+name);
+}
+async function bulkAdd(){
+  const lines=document.getElementById("bulk").value.split("\n").map(l=>l.trim()).filter(Boolean);
+  if(!lines.length) return;
+  const yy=String(new Date().getFullYear()).slice(2); let n=parseInt(nextCode().slice(2),10);
+  for(const l of lines){
+    const p=l.split(/[,،;\t]/).map(x=>x.trim());
+    const o={id:uid(),code:yy+String(n++).padStart(4,"0"),name:p[0],parent:p[1]||"",phone:p[2]||"",classId:selClass};
+    if(DB) await put("students",o); else { S.students.push(o); }
+  }
+  if(!DB){saveLocal()} toast("أُضيف "+lines.length+" تلميذاً");
+}
+function editStudent(id){
+  const s=S.students.find(x=>x.id===id);
+  document.getElementById("modal").innerHTML=`<div class="overlay" onclick="if(event.target===this)closeModal()"><div class="dialog">
+    <h2 style="margin-top:0">تعديل التلميذ <span class="muted" style="direction:ltr;display:inline-block">${esc(s.code)}</span></h2>
+    <label class="f">الاسم<input id="eName" value="${esc(s.name)}"></label>
+    <label class="f">اسم الولي<input id="eParent" value="${esc(s.parent||"")}"></label>
+    <label class="f">هاتف الولي<input id="ePhone" value="${esc(s.phone||"")}" style="direction:ltr"></label>
+    <label class="f">القسم<select id="eClass">${S.classes.map(c=>`<option value="${c.id}" ${c.id===s.classId?"selected":""}>${esc(c.name)}</option>`).join("")}</select></label>
+    <div class="row"><button class="btn" onclick="saveStudent('${id}')">حفظ</button><button class="btn ghost" onclick="closeModal()">إلغاء</button><button class="btn red" onclick="delStudent('${id}')">حذف</button></div>
+  </div></div>`;
+}
+function saveStudent(id){
+  const s=S.students.find(x=>x.id===id);
+  put("students",{...s,name:document.getElementById("eName").value.trim()||s.name,parent:document.getElementById("eParent").value.trim(),phone:document.getElementById("ePhone").value.trim(),classId:document.getElementById("eClass").value});
+  closeModal();
+}
+function delStudent(id){ del("students",id); closeModal(); }
+function askDelClass(id){
+  const c=cls(id); const n=S.students.filter(s=>s.classId===id).length;
+  document.getElementById("modal").innerHTML=`<div class="overlay"><div class="dialog"><h2 style="margin-top:0">حذف ${esc(c.name)}؟</h2>
+    <p>سيُحذف القسم و${n} تلميذاً منه. لا يمكن التراجع.</p>
+    <div class="row"><button class="btn red" onclick="delClass('${id}')">حذف</button><button class="btn ghost" onclick="closeModal()">إلغاء</button></div></div></div>`;
+}
+async function delClass(id){
+  closeModal();
+  const ss=S.students.filter(s=>s.classId===id);
+  if(DB){ for(const s of ss) await del("students",s.id); await del("classes",id); }
+  else { S.students=S.students.filter(s=>s.classId!==id); S.classes=S.classes.filter(c=>c.id!==id); saveLocal(); render(); }
+}
+function closeModal(){ document.getElementById("modal").innerHTML=""; }
+
+/* --- Barcode labels --- */
+function vLabels(){
+  if(!S.classes.length) return emptyData();
+  if(!labelClass||!cls(labelClass)) labelClass=S.classes[0].id;
+  const list=S.students.filter(s=>s.classId===labelClass).sort((a,b)=>a.name.localeCompare(b.name,"ar"));
+  const c=cls(labelClass);
+  return `<div class="card noprint"><h2>ملصقات الكودبار</h2>
+    <p class="muted" style="margin-top:0">يتولد لكل تلميذ رقم وكودبار (Code 39) تلقائياً. تُلصق في دفتر المراسلة أو الكراس اليومي، ويُمسح بأي قارئ كودبار أو بكاميرا الهاتف.</p>
+    <label class="f">القسم<select onchange="labelClass=this.value;render()">${S.classes.map(k=>`<option value="${k.id}" ${k.id===labelClass?"selected":""}>${esc(k.name)}</option>`).join("")}</select></label>
+    ${IS_APP?`<p class="muted" style="margin:0">للطباعة: خذ نسخة احتياطية من «الإعدادات»، وافتح ملف التطبيق index.html على الحاسوب، واسترجع النسخة ثم اطبع.</p>`:`<button class="btn" onclick="window.print()">🖨️ طباعة</button>`}</div>
+  ${list.length?`<div class="labels">${list.map(s=>`<div class="label"><div class="ln">${esc(s.name)}</div><div class="lc">${esc(c.name)} · ${esc(S.cfg.school)}</div>${barcodeSVG(s.code)}<div class="code">${esc(s.code)}</div></div>`).join("")}</div>`:`<div class="card empty">لا يوجد تلاميذ في هذا القسم.</div>`}`;
+}
+
+/* --- Settings --- */
+function vSettings(){
+  const c=S.cfg;
+  return `<div class="card"><h2>الإعدادات</h2>
+    <label class="f">اسم المؤسسة<input id="cSchool" value="${esc(c.school)}"></label>
+    <div class="row">
+      <label class="f">مهلة الإشعار بعد تسجيل الغياب (بالدقائق)<input id="cDelay" type="number" min="0" value="${esc(c.delayMin)}"></label>
+      <label class="f">رمز الدولة للهاتف<input id="cCc" value="${esc(c.cc)}" style="direction:ltr"></label>
+    </div>
+    <label class="f">نص الرسالة للولي<textarea id="cTpl" style="min-height:110px" oninput="smsCount()">${esc(c.template)}</textarea></label>
+    <p class="muted" id="smsCnt" style="margin-top:-4px"></p>
+    <p class="muted" style="margin-top:-4px">المتغيرات: {الاسم} {الرقم} {القسم} {المادة} {الأستاذ} {التاريخ} {من} {إلى} {المؤسسة}</p>
+    <div class="row"><button class="btn" onclick="saveSettings()">حفظ</button><button class="btn ghost" onclick="document.getElementById('cTpl').value=DEFAULT_CFG.template">استرجاع النص الافتراضي</button></div>
+  </div>
+  ${flashHTML()}
+  <div class="card"><h2>الإرسال الآلي عبر SMS</h2>
+    ${IS_APP?`<label class="switch"><input type="checkbox" ${S.cfg.autoSms?"checked":""} onchange="saveCfg({...S.cfg,autoSms:this.checked})"> إرسال SMS آلياً من شريحة هذا الجهاز عند حلول الموعد</label>
+      <p class="muted" style="margin-top:0">تُرسل الرسائل من رصيد الشريحة. اترك التطبيق مفتوحاً أثناء الدوام (الشاشة لا تنطفئ ما دام مفتوحاً). أي رسالة تأخرت تُرسل فور فتح التطبيق.</p>
+      <div class="row" style="align-items:end"><label class="f" style="margin:0">رقم لتجربة الإرسال<input id="testPhone" inputmode="tel" placeholder="0550 12 34 56" style="direction:ltr"></label>
+      <button class="btn ghost" style="flex:0 0 auto" onclick="testSms()">إرسال رسالة تجريبية</button></div>`
+    :`<p class="muted" style="margin:0">الإرسال الآلي يعمل فقط في تطبيق الطابليت (APK) لأنه يستعمل شريحة الجهاز.</p>`}
+  </div>
+  <div class="card"><h2>نسخة احتياطية</h2>
+    <p class="muted" style="margin-top:0">البيانات محفوظة على هذا الجهاز فقط. خذ نسخة احتياطية كل أسبوع، وبها تنقل البيانات إلى جهاز آخر.</p>
+    <div class="row">
+      <button class="btn" onclick="showBackup()">أخذ نسخة احتياطية</button>
+      <label class="btn ghost">استرجاع من ملف<input type="file" accept=".json,application/json,text/plain" class="hide" onchange="restoreFile(this)"></label>
+      <button class="btn ghost" onclick="restorePaste()">استرجاع بلصق النص</button>
+    </div></div>
+  <div class="card"><h2>طريقة العمل</h2>
+    <ol style="margin:0;padding-inline-start:20px;line-height:1.9">
+      <li>الإدارة تُدخل الأقسام والتلاميذ وأرقام الأولياء، فيتولد لكل تلميذ رقم وكودبار.</li>
+      <li>تُطبع الملصقات وتُلصق في الدفتر اليومي لكل تلميذ.</li>
+      <li>المشرف يبدأ الحصة (القسم، المادة، الأستاذ، التوقيت) ويسجّل الغائبين بالضغط على أسمائهم أو بمسح الكودبار.</li>
+      <li>بعد المهلة المحددة يرسل التطبيق SMS آلياً لولي كل تلميذ غائب من شريحة الطابليت، ويمكن أيضاً الإرسال يدوياً عبر واتساب.</li>
+    </ol></div>`;
+}
+async function testSms(){
+  const ph=intlPhone(document.getElementById("testPhone").value);
+  if(!ph) return toast("أدخل رقماً",true);
+  try{ await smsPlugin().send({phone:"+"+ph,message:"رسالة تجريبية من تطبيق غياب — "+(S.cfg.school||"")}); toast("أُرسلت الرسالة التجريبية ✓"); }
+  catch(e){ toast("فشل الإرسال: "+((e&&e.message)||e),true); }
+}
+function smsCount(){
+  const el=document.getElementById("cTpl"), out=document.getElementById("smsCnt"); if(!el||!out) return;
+  const sample={id:"x",studentId:"",studentName:"محمد الأمين بن عبد الرحمان",code:"260001",classId:"",className:"2 ثانوي — علوم تجريبية 1",subject:"الرياضيات",teacher:"محمد بوعلام",date:todayStr(),from:"08:00",to:"09:00"};
+  const old=S.cfg.template; S.cfg.template=el.value; const m=message(sample); S.cfg.template=old;
+  const n=[...m].length, parts=n<=70?1:Math.ceil(n/67);
+  out.innerHTML=`مثال: ${n} حرفاً ≈ <b>${parts}</b> ${parts===1?"رسالة":"رسائل"} SMS لكل غياب (الرسالة العربية الواحدة 70 حرفاً). كلما قصُر النص قلّت التكلفة.`;
+}
+function saveSettings(){
+  saveCfg({...S.cfg,school:document.getElementById("cSchool").value.trim()||DEFAULT_CFG.school,delayMin:Math.max(0,Number(document.getElementById("cDelay").value)||0),
+    cc:document.getElementById("cCc").value.replace(/\D/g,"")||"213",template:document.getElementById("cTpl").value});
+  toast("حُفظت الإعدادات");
+}
+
+/* --- Backup / restore --- */
+function backupText(){ return JSON.stringify({app:"ghiyab",v:1,at:new Date().toISOString(),classes:S.classes,students:S.students,absences:S.absences,cfg:S.cfg}); }
+function showBackup(){
+  const t=backupText();
+  document.getElementById("modal").innerHTML=`<div class="overlay" onclick="if(event.target===this)closeModal()"><div class="dialog">
+    <h2 style="margin-top:0">نسخة احتياطية</h2>
+    <p class="muted">انسخ النص واحفظه، مثلاً أرسله لنفسك عبر واتساب أو البريد.</p>
+    <textarea id="bkTxt" readonly style="width:100%;min-height:160px;direction:ltr;font-size:11px">${esc(t)}</textarea>
+    <div class="row" style="margin-top:8px"><button class="btn" onclick="copyBackup()">نسخ</button>
+    ${IS_APP?"":`<a class="btn ghost" download="ghiyab-${todayStr()}.json" href="data:application/json;charset=utf-8,${encodeURIComponent(t)}">تنزيل ملف</a>`}
+    <button class="btn ghost" onclick="closeModal()">إغلاق</button></div></div></div>`;
+}
+async function copyBackup(){ const el=document.getElementById("bkTxt"); try{await navigator.clipboard.writeText(el.value); toast("نُسخت النسخة الاحتياطية")}catch(e){ el.select(); try{document.execCommand("copy");toast("نُسخت النسخة الاحتياطية")}catch(_){toast("انسخ النص يدوياً",true)} } }
+function applyBackup(txt){
+  let d; try{ d=JSON.parse(txt) }catch(e){ return toast("الملف غير صالح",true) }
+  if(!d||d.app!=="ghiyab"||!Array.isArray(d.students)) return toast("هذه ليست نسخة احتياطية لتطبيق غياب",true);
+  document.getElementById("modal").innerHTML=`<div class="overlay"><div class="dialog"><h2 style="margin-top:0">استرجاع النسخة؟</h2>
+    <p>${d.classes.length} قسم، ${d.students.length} تلميذ، ${d.absences.length} غياب.<br>ستُستبدل كل البيانات الحالية على هذا الجهاز.</p>
+    <div class="row"><button class="btn red" id="okRestore">استرجاع</button><button class="btn ghost" onclick="closeModal()">إلغاء</button></div></div></div>`;
+  document.getElementById("okRestore").onclick=()=>{ S.classes=d.classes||[]; S.students=d.students||[]; S.absences=d.absences||[]; S.cfg={...DEFAULT_CFG,...(d.cfg||{})}; saveLocal(); closeModal(); toast("استُرجعت البيانات"); };
+}
+function restoreFile(inp){ const f=inp.files&&inp.files[0]; inp.value=""; if(!f) return; const r=new FileReader(); r.onload=()=>applyBackup(String(r.result)); r.readAsText(f); }
+function restorePaste(){
+  document.getElementById("modal").innerHTML=`<div class="overlay" onclick="if(event.target===this)closeModal()"><div class="dialog">
+    <h2 style="margin-top:0">الصق النسخة الاحتياطية</h2><textarea id="pasteTxt" style="width:100%;min-height:160px;direction:ltr;font-size:11px"></textarea>
+    <div class="row" style="margin-top:8px"><button class="btn" onclick="applyBackup(document.getElementById('pasteTxt').value)">متابعة</button><button class="btn ghost" onclick="closeModal()">إلغاء</button></div></div></div>`;
+}
+
+/* --- Demo data --- */
+async function seedDemo(){
+  const id=uid(); const yy=String(new Date().getFullYear()).slice(2);
+  const names=["عبد الله سلطان","سلمى محمدي","أمين بن علي","ياسمين قاسمي","محمد الأمين زروقي","إيمان بوزيد","يوسف حمادي","رانية بلقاسم","أيوب مرابط","هاجر سعيدي","إسحاق بن يحيى","مريم عيساوي","وليد شريف","نور الهدى خالدي","أنس بوعزة","آية فرحات","رياض منصوري","خديجة بن سالم","زكرياء حداد","سارة لعمامري","إلياس بوشامة","شيماء قويدر","عماد طالبي","لينة بن عمر","حمزة رحماني"];
+  const cl={id,level:"2 ثانوي",name:"2 ثانوي — علوم تجريبية 1"};
+  const base=parseInt(nextCode().slice(2),10);
+  const studs=names.map((n,i)=>({id:uid(),code:yy+String(base+i).padStart(4,"0"),name:n,parent:"ولي "+n.split(" ").slice(-1)[0],phone:"",classId:id}));
+  if(DB){ await put("classes",cl); for(const s of studs) await put("students",s); }
+  else { S.classes.push(cl); S.students.push(...studs); saveLocal(); }
+  selClass=id; lsSet("ghiyab_selClass",id); toast("أُضيف قسم تجريبي بـ 25 تلميذاً");
+}
+
+/* ============ Boot ============ */
+render();
+if(IS_APP){ try{ const p=smsPlugin(); p&&p.keepAwake&&p.keepAwake(); }catch(e){} }
+let lastAct=-1;
+setInterval(()=>{
+  const n=needAction().length;
+  if(lastAct>=0&&n>lastAct){ try{navigator.vibrate&&navigator.vibrate([200,100,200])}catch(e){} toast("🔔 إشعارات تحتاج إجراء — افتح «الإشعارات»"); }
+  lastAct=n; updateBadge();
+  if(view==="notifs") document.querySelectorAll("[data-cd]").forEach(el=>{ el.textContent=cdText(el.dataset.cd); });
+},1000);
+// إعادة رسم صفحة الإشعارات عند تغيّر الحالات
+let lastSig="";
+setInterval(()=>{ if(view!=="notifs") return; const ae=document.activeElement; if(ae&&["INPUT","TEXTAREA","SELECT"].includes(ae.tagName)) return;
+  const sig=S.absences.map(a=>a.id+a.status+(a.notifyAt<=Date.now())).join(); if(sig!==lastSig){ lastSig=sig; render(); } },2000);
+</script>
+</body>
+</html>

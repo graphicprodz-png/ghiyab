@@ -1,0 +1,8 @@
+{
+  "appId": "dz.ghiyab.app",
+  "appName": "غياب",
+  "webDir": "www",
+  "android": {
+    "backgroundColor": "#f4f6f5"
+  }
+}

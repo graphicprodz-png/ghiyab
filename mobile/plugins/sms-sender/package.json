@@ -1,0 +1,15 @@
+{
+  "name": "ghiyab-sms-sender",
+  "version": "1.0.0",
+  "description": "إرسال SMS من شريحة الجهاز (أندرويد) لتطبيق غياب",
+  "main": "index.js",
+  "license": "MIT",
+  "capacitor": {
+    "android": {
+      "src": "android"
+    }
+  },
+  "peerDependencies": {
+    "@capacitor/core": ">=6.0.0"
+  }
+}

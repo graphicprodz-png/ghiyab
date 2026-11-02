@@ -1,0 +1,75 @@
+name: بناء تطبيق أندرويد (APK)
+
+on:
+  push:
+    branches: [main]
+    paths: ['mobile/**', '.github/workflows/android.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - uses: android-actions/setup-android@v3
+
+      - name: تثبيت Capacitor
+        run: npm install --no-audit --no-fund
+
+      - name: إنشاء مشروع أندرويد
+        run: |
+          cp node_modules/@capacitor/core/dist/capacitor.js www/capacitor.js || true
+          npx cap add android
+
+      - name: الأيقونة وشاشة البداية
+        continue-on-error: true
+        run: npx @capacitor/assets generate --android --iconBackgroundColor '#0f6b4f' --splashBackgroundColor '#0f6b4f'
+
+      - name: مزامنة
+        run: npx cap sync android
+
+      - name: بناء APK
+        working-directory: mobile/android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleRelease --no-daemon --stacktrace
+
+      - name: توقيع APK
+        run: |
+          BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
+          IN=android/app/build/outputs/apk/release/app-release-unsigned.apk
+          "$BT/zipalign" -f -p 4 "$IN" aligned.apk
+          "$BT/apksigner" sign --ks ghiyab.keystore --ks-key-alias ghiyab --ks-pass pass:ghiyab123 --key-pass pass:ghiyab123 --out ghiyab.apk aligned.apk
+          "$BT/apksigner" verify ghiyab.apk
+          ls -la ghiyab.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ghiyab-apk
+          path: mobile/ghiyab.apk
+
+      - name: نشر نسخة للتحميل
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v1.${{ github.run_number }}
+          name: غياب — الإصدار 1.${{ github.run_number }}
+          body: |
+            ملف التثبيت على الطابليت: **ghiyab.apk**
+            حمّله من الطابليت، افتحه، واسمح بتثبيت التطبيقات من مصادر غير معروفة إذا طُلب ذلك.
+          files: mobile/ghiyab.apk
