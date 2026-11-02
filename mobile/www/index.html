@@ -151,6 +151,17 @@ table.wk tr.today td.cur span{color:#e9fff1}
 .ssign span{font-weight:400}
 .sfoot{text-align:center;font-size:10.5px;color:#555}
 @page landscape{size:A4 landscape;margin:0}
+@page flowl{size:A4 landscape;margin:10mm}
+@page flowp{size:A4 portrait;margin:12mm}
+.sheet.flow{height:auto;min-height:794px;overflow:visible;page:flowl}
+.sheet.flow.portrait{width:794px;min-height:1123px;page:flowp}
+.sheet .stitle{text-align:center}.sheet .stitle h1{font-size:20px;margin:0}.sheet .stitle div{font-size:13px}
+.sheet h3.sec{margin:6px 0 4px;font-size:14px;border-bottom:1px solid #999;padding-bottom:3px}
+.sheet tr.zero td{color:#888}
+.sheet tr.w1 td{background:#fff6e0}.sheet tr.w2 td{background:#fde6e3}
+.sheet thead{display:table-header-group}.sheet tr{break-inside:avoid}
+.sheet .letter{font-size:15px;line-height:2.1;padding:10px 20px}
+.jbtn{border:1px solid var(--line);background:#fff;border-radius:7px;font-size:11.5px;padding:1px 6px;cursor:pointer}
 @media print{
   body.rep header,body.rep .rtool,body.rep .flash{display:none!important}
   body.rep main{padding:0;max-width:none}
@@ -158,6 +169,8 @@ table.wk tr.today td.cur span{color:#e9fff1}
   html,body.rep{background:#fff!important}
   body.rep main>*:not(.sheetwrap),body.rep #modal{display:none!important}
   body.rep .sheet{transform:none!important;box-shadow:none;width:297mm;height:205mm;break-after:avoid;page-break-after:avoid}
+  body.rep .sheet.flow{width:auto;height:auto;min-height:0;padding:0}
+  body.rep .noprint{display:none!important}
 }
 @media print{.printonly{display:block}}
 table.tt{min-width:640px;table-layout:fixed}
@@ -191,6 +204,7 @@ table.tt td.full select{font-weight:700;color:var(--brand)}
     <button data-v="students">الأقسام والتلاميذ</button>
     <button data-v="timetable">جدول التوقيت</button>
     <button data-v="staff">المواد والأساتذة</button>
+    <button data-v="reports">📊 التقارير</button>
     <button data-v="labels">ملصقات الكودبار</button>
     <button data-v="settings">الإعدادات</button>
   </nav>
@@ -215,6 +229,8 @@ const DEFAULT_CFG={
   logo:"",
   sendWindow:{from:"07:30",to:"18:30"},
   sendMode:"auto",
+  terms:[{name:"الفصل الأول",from:"2026-09-21",to:"2026-12-17"},{name:"الفصل الثاني",from:"2027-01-04",to:"2027-03-18"},{name:"الفصل الثالث",from:"2027-04-04",to:"2027-06-10"}],
+  warn1:6, warn2:12,
   pin:"",
   lastBackup:0,
   autoSms:true,
@@ -388,12 +404,13 @@ function render(){
   document.getElementById("hLogo").innerHTML=S.cfg.logo?`<img src="${S.cfg.logo}" alt="" style="height:30px;width:30px;object-fit:contain;background:#fff;border-radius:8px;padding:2px;vertical-align:middle">`:"📋";
   document.getElementById("hDir").textContent=S.cfg.directorate?"مديرية التربية لولاية "+S.cfg.directorate:"";
   updateBadge();
-  document.body.classList.toggle("rep",view==="report");
+  document.body.classList.toggle("rep",["report","reports","letter"].includes(view));
   const m=document.getElementById("main");
   const active=document.activeElement&&document.activeElement.id;
   setTimeout(()=>{ if(view==="settings"&&setTab==="msg") smsCount(); },0);
   if(S.cfg.pin&&PROTECTED.includes(view)&&Date.now()>unlockUntil){ m.innerHTML=pinScreen(); setTimeout(()=>{const x=document.getElementById("pinIn"); x&&x.focus()},30); return; }
-  m.innerHTML=({session:vHome,round:vRound,week:vWeek,day:vDay,att:vAtt,sessions:vSessions,report:vReport,notifs:vNotifs,students:vStudents,timetable:vTimetable,staff:vStaff,labels:vLabels,settings:vSettings}[view]||vSession)();
+  m.innerHTML=({reports:vReports,letter:vLetter,session:vHome,round:vRound,week:vWeek,day:vDay,att:vAtt,sessions:vSessions,report:vReport,notifs:vNotifs,students:vStudents,timetable:vTimetable,staff:vStaff,labels:vLabels,settings:vSettings}[view]||vSession)();
+  if(["reports","letter"].includes(view)) setTimeout(fitSheets,0);
   if(active==="scanInput"){ const s=document.getElementById("scanInput"); if(s) s.focus(); }
 }
 
@@ -757,6 +774,14 @@ function vStudents(){
     </div>
     ${!S.classes.length?`<div style="margin-top:10px"><button class="btn ghost" onclick="seedDemo()">أو أضف بيانات تجريبية</button></div>`:""}
   </div>
+  <div class="card"><h2>📥 استيراد / 📤 تصدير Excel</h2>
+    <p class="muted" style="margin-top:0">استورد قوائم التلاميذ من ملف Excel (xlsx أو xls أو csv). يتعرّف التطبيق على أعمدة: الاسم واللقب (أو اللقب والاسم منفصلين)، الولي، الهاتف، القسم. إذا كان في الملف ورقة لكل قسم، تُنشأ الأقسام تلقائياً بأسماء الأوراق.</p>
+    <div class="row">
+      <label class="btn" style="flex:0 0 auto">📥 استيراد ملف Excel<input type="file" accept=".xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv" class="hide" onchange="importExcel(this)"></label>
+      ${S.classes.length?`<button class="btn ghost" style="flex:0 0 auto" onclick="exportStudents()">📤 تصدير كل الأقسام</button>`:""}
+      ${selClass&&cls(selClass)?`<button class="btn ghost" style="flex:0 0 auto" onclick="exportStudents('${selClass}')">📤 تصدير هذا القسم</button>`:""}
+      <button class="btn ghost" style="flex:0 0 auto" onclick="templateXlsx()">نموذج ملف فارغ</button>
+    </div></div>
   ${flashHTML()}
   ${c?`<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><h2 style="margin:0">${esc(c.name)} — ${list.length} تلميذ</h2>
       <button class="btn red sm" onclick="askDelClass('${c.id}')">حذف القسم</button></div>
@@ -959,7 +984,7 @@ function setData(){
       <label class="f" style="margin:0">إلى<input type="date" id="exTo" value="${todayStr()}"></label>
       <button class="btn ghost" style="flex:0 0 auto" onclick="exportAbsences()">تصدير</button>
     </div>
-    <p class="muted" style="margin-bottom:0">${IS_APP?"يُنسخ الجدول، ثم الصقه في Excel أو Google Sheets.":"يُنزَّل ملف CSV يُفتح في Excel."}</p></div>
+    <p class="muted" style="margin-bottom:0">يُحفظ ملف Excel (xlsx)${IS_APP?" في مجلد التنزيلات Download/Ghiyab":""}.</p></div>
   <div class="card"><h2>بداية سنة دراسية جديدة</h2>
     <p class="muted" style="margin-top:0">يحذف سجل الغيابات القديم ويُبقي الأقسام والتلاميذ والأساتذة والجدول. خذ نسخة احتياطية قبل ذلك.</p>
     <button class="btn ghost" onclick="confirmBox('حذف سجل الغيابات كاملاً؟','سيُحذف ${S.absences.length} غياب. لا يمكن التراجع.',()=>{S.absences=[];saveLocal();render();toast('حُذف سجل الغيابات')})">حذف سجل الغيابات</button></div>
@@ -995,16 +1020,10 @@ function exportAbsences(){
   const rows=S.absences.filter(a=>a.date>=from&&a.date<=to).sort((a,b)=>(a.date+a.from).localeCompare(b.date+b.from));
   if(!rows.length) return toast("لا توجد غيابات في هذه الفترة",true);
   const st={sent:"أُرسل",waiting:"في الانتظار",sending:"جارِ الإرسال",failed:"لم يُرسل"};
-  const head=["التاريخ","من","إلى","القسم","رقم التلميذ","التلميذ","المادة","الأستاذ","هاتف الولي","حالة الإشعار","الوسيلة"];
+  const head=["التاريخ","من","إلى","القسم","رقم التلميذ","التلميذ","المادة","الأستاذ","هاتف الولي","حالة الإشعار","الوسيلة","التبرير"];
   const data=rows.map(a=>{ const s=S.students.find(x=>x.id===a.studentId)||{}; const c=cls(a.classId);
-    return [fmtDate(a.date),a.from,a.to,c?c.name:a.className,s.code||a.code,s.name||a.studentName,a.subject,a.teacher,s.phone||"",st[a.status]||a.status,({sms:"SMS",whatsapp:"واتساب",manual:"أخرى"})[a.channel]||""]; });
-  if(IS_APP){
-    const tsv=[head,...data].map(r=>r.map(v=>String(v??"").replace(/[\t\n]/g," ")).join("\t")).join("\n");
-    navigator.clipboard.writeText(tsv).then(()=>toast(`نُسخ ${rows.length} سطراً — الصقه في Excel`),()=>toast("تعذّر النسخ",true));
-  }else{
-    const csv="﻿"+[head,...data].map(r=>r.map(v=>'"'+String(v??"").replace(/"/g,'""')+'"').join(",")).join("\r\n");
-    const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv;charset=utf-8"})); a.download=`غيابات-${from}-${to}.csv`; a.click();
-  }
+    return [fmtDate(a.date),a.from,a.to,c?c.name:a.className,s.code||a.code,s.name||a.studentName,a.subject,a.teacher,s.phone||"",st[a.status]||a.status,({sms:"SMS",whatsapp:"واتساب",manual:"أخرى"})[a.channel]||"",a.justified?("مبرر "+(a.reason||"")).trim():"غير مبرر"]; });
+  saveBlob(XL.write([{name:"الغيابات",widths:[12,7,7,22,10,26,18,22,14,12,9,22],rows:[head,...data]}]),`غيابات-${from}-${to}.xlsx`);
 }
 function simsCard(){
   const sims=S.cfg.simsCache||[], m=S.cfg.simMap||{};
@@ -1057,7 +1076,7 @@ function showBackup(){
     <p class="muted">انسخ النص واحفظه، مثلاً أرسله لنفسك عبر واتساب أو البريد.</p>
     <textarea id="bkTxt" readonly style="width:100%;min-height:160px;direction:ltr;font-size:11px">${esc(t)}</textarea>
     <div class="row" style="margin-top:8px"><button class="btn" onclick="copyBackup()">نسخ</button>
-    ${IS_APP?"":`<a class="btn ghost" onclick="S.cfg.lastBackup=Date.now();saveLocal()" download="ghiyab-${todayStr()}.json" href="data:application/json;charset=utf-8,${encodeURIComponent(t)}">تنزيل ملف</a>`}
+    <button class="btn ghost" onclick="S.cfg.lastBackup=Date.now();saveLocal();saveBlob(new Blob([document.getElementById('bkTxt').value],{type:'application/json'}),'ghiyab-نسخة-'+todayStr()+'.json')">💾 حفظ ملف</button>
     <button class="btn ghost" onclick="closeModal()">إغلاق</button></div></div></div>`;
 }
 async function copyBackup(){ const el=document.getElementById("bkTxt"); S.cfg.lastBackup=Date.now(); saveLocal(); try{await navigator.clipboard.writeText(el.value); toast("نُسخت النسخة الاحتياطية")}catch(e){ el.select(); try{document.execCommand("copy");toast("نُسخت النسخة الاحتياطية")}catch(_){toast("انسخ النص يدوياً",true)} } }
@@ -1124,7 +1143,9 @@ function resumeSession(id){
 }
 let reportId=null, reportBack="sessions", zoom=0; // 0 = ملاءمة الشاشة
 function openReport(id){ reportBack=view; reportId=id; zoom=0; view="report"; flashMsg=null; render(); window.scrollTo(0,0); }
-function sheetScale(){ if(zoom) return zoom; const w=Math.min(document.getElementById("main").clientWidth||window.innerWidth,window.innerWidth)-8; return Math.min(1,w/1123); }
+function sheetScale(W){ if(zoom) return zoom; const w=Math.min(document.getElementById("main").clientWidth||window.innerWidth,window.innerWidth)-8; return Math.min(1,w/(W||1123)); }
+// ضبط ارتفاع الإطار حسب طول الوثيقة بعد التكبير/التصغير
+function fitSheets(){ document.querySelectorAll(".sheetwrap.flowwrap").forEach(w=>{ const sh=w.querySelector(".sheet"); const z=Number(sh.dataset.z||1); w.style.height=Math.ceil(sh.offsetHeight*z)+6+"px"; }); }
 function setZoom(d){ const z=sheetScale(); zoom=d===0?0:Math.min(2,Math.max(0.3,Math.round((z+d)*10)/10)); render(); }
 function vReport(){
   const d=sessionData(reportId); if(!d) return `<div class="card empty">الحصة غير موجودة.</div>`;
@@ -1166,6 +1187,359 @@ async function printSheet(pdf){
   if(IS_APP&&pl&&pl.print){ if(pdf) toast("في نافذة الطباعة اختر «حفظ بتنسيق PDF»"); try{ await pl.print({name,landscape:true}); }catch(e){ toast("تعذّرت الطباعة: "+((e&&e.message)||e),true); } return; }
   if(pdf) toast("في نافذة الطباعة اختر «حفظ بتنسيق PDF / Save as PDF»");
   const t=document.title; document.title=name; setTimeout(()=>{ window.print(); document.title=t; },pdf?600:50);
+}
+
+/* ============ التقارير ============ */
+const ymd=dt=>dt.getFullYear()+"-"+String(dt.getMonth()+1).padStart(2,"0")+"-"+String(dt.getDate()).padStart(2,"0");
+const addDays=(d,n)=>{ const x=new Date(d+"T12:00:00"); x.setDate(x.getDate()+n); return ymd(x); };
+const MONTHS=["جانفي","فيفري","مارس","أفريل","ماي","جوان","جويلية","أوت","سبتمبر","أكتوبر","نوفمبر","ديسمبر"];
+const absHours=a=>Math.max(0,(hmMin(a.to)-hmMin(a.from))/60)||1;
+const fmtH=h=>(Math.round(h*10)/10).toString().replace(".",",");
+let rp={type:"class",range:"week",date:todayStr(),month:todayStr().slice(0,7),term:0,from:todayStr().slice(0,8)+"01",to:todayStr(),cls:"",stu:"",only:false};
+function yearRange(){ const t=S.cfg.terms||[]; if(t.length){ return [t.map(x=>x.from).sort()[0],t.map(x=>x.to).sort().slice(-1)[0]]; }
+  const y=parseInt(S.cfg.schoolYear)||new Date().getFullYear(); return [y+"-09-01",(y+1)+"-08-31"]; }
+function rpRange(){
+  if(rp.range==="day") return [rp.date,rp.date,`يوم ${DAY_NAMES[new Date(rp.date+"T12:00:00").getDay()]} ${fmtDate(rp.date)}`];
+  if(rp.range==="week"){ const d=new Date(rp.date+"T12:00:00"); const a=addDays(rp.date,-d.getDay()); const b=addDays(a,6); return [a,b,`الأسبوع من ${fmtDate(a)} إلى ${fmtDate(b)}`]; }
+  if(rp.range==="month"){ const [y,m]=rp.month.split("-").map(Number); const a=`${y}-${String(m).padStart(2,"0")}-01`; const b=ymd(new Date(y,m,0,12)); return [a,b,`شهر ${MONTHS[m-1]} ${y}`]; }
+  if(rp.range==="term"){ const t=(S.cfg.terms||[])[rp.term]||{name:"",from:todayStr(),to:todayStr()}; return [t.from,t.to,`${t.name} (${fmtDate(t.from)} — ${fmtDate(t.to)})`]; }
+  if(rp.range==="year"){ const [a,b]=yearRange(); return [a,b,`السنة الدراسية ${S.cfg.schoolYear||""}`]; }
+  return [rp.from,rp.to,`من ${fmtDate(rp.from)} إلى ${fmtDate(rp.to)}`];
+}
+const inR=(d,[a,b])=>d>=a&&d<=b;
+function classStats(cid,R){
+  const abs=S.absences.filter(a=>a.classId===cid&&inR(a.date,R));
+  const sess=allSessions().filter(x=>x.classId===cid&&inR(x.date,R)&&(x.savedAt||x.legacy||S.absences.some(a=>a.sessionId===x.id)));
+  const slots=sess.reduce((n,x)=>n+((x.roster&&x.roster.length)||classStudents(cid).length),0);
+  const hours=abs.reduce((h,a)=>h+absHours(a),0), unj=abs.filter(a=>!a.justified);
+  return {abs,sess,hours,unjHours:unj.reduce((h,a)=>h+absHours(a),0),unj:unj.length,rate:slots?Math.round((1-abs.length/slots)*1000)/10:100};
+}
+function stuStats(sid,abs){ const mine=abs.filter(a=>a.studentId===sid);
+  return {n:mine.length,h:mine.reduce((h,a)=>h+absHours(a),0),days:new Set(mine.map(a=>a.date)).size,just:mine.filter(a=>a.justified).length,
+    unjH:mine.filter(a=>!a.justified).reduce((h,a)=>h+absHours(a),0),last:mine.map(a=>a.date).sort().slice(-1)[0]||""}; }
+const wClass=h=>h>=S.cfg.warn2?"w2":h>=S.cfg.warn1?"w1":"";
+const wLabel=h=>h>=S.cfg.warn2?"إنذار كتابي":h>=S.cfg.warn1?"استدعاء الولي":"";
+function docHead(title,sub){
+  const cf=S.cfg;
+  return `<div class="shead"><div class="sh-r"><div>الجمهورية الجزائرية الديمقراطية الشعبية</div><div>وزارة التربية الوطنية</div>${cf.directorate?`<div>مديرية التربية لولاية ${esc(cf.directorate)}</div>`:""}<div><b>${esc(cf.school||"")}</b></div></div>
+    <div class="sh-c">${cf.logo?`<img src="${cf.logo}" alt="">`:""}<h1>${title}</h1><div>${sub||""}</div></div>
+    <div class="sh-l">${cf.schoolCode?`<div>رمز المؤسسة: ${esc(cf.schoolCode)}</div>`:""}<div>السنة الدراسية ${esc(cf.schoolYear||"")}</div><div>تاريخ الطبع: ${fmtDate(todayStr())}</div></div></div>`;
+}
+const docSign=()=>`<div class="ssign" style="margin-top:14px"><div>مستشار(ة) التربية<br><span>${esc(S.cfg.counselor||"")}</span></div><div></div><div>مدير(ة) المؤسسة<br><span>${esc(S.cfg.director||"")}</span></div></div>`;
+function docTools(back,portrait){
+  const W=portrait?794:1123;
+  return `<div class="rtool noprint">${back?`<button class="btn ghost sm" onclick="view='${back}';render()">→ رجوع</button>`:""}
+    <span class="zoom"><button class="btn ghost sm" onclick="setZoom(-0.1)">−</button><b>${Math.round(sheetScale(W)*100)}%</b><button class="btn ghost sm" onclick="setZoom(0.1)">+</button><button class="btn ghost sm" onclick="setZoom(0)">ملاءمة</button></span>
+    <button class="btn sm" onclick="printDoc()">🖨️ طباعة</button><button class="btn sm" onclick="printDoc(true)">📄 حفظ PDF</button>${view==="reports"?`<button class="btn ghost sm" onclick="exportReportXlsx()">📊 Excel</button>`:""}</div>`;
+}
+function docWrap(inner,portrait){ const W=portrait?794:1123, z=sheetScale(W);
+  return `<div class="sheetwrap flowwrap"><div class="sheet flow ${portrait?"portrait":""}" data-z="${z}" style="transform:scale(${z})">${inner}</div></div>`; }
+async function printDoc(pdf){
+  const portrait=!!document.querySelector(".sheet.flow.portrait");
+  const pl=smsPlugin();
+  if(IS_APP&&pl&&pl.print){ if(pdf) toast("في نافذة الطباعة اختر «حفظ بتنسيق PDF»"); try{ await pl.print({name:"تقرير-غياب",landscape:!portrait}); }catch(e){ toast("تعذّرت الطباعة",true); } return; }
+  if(pdf) toast("في نافذة الطباعة اختر «حفظ بتنسيق PDF / Save as PDF»");
+  setTimeout(()=>window.print(),pdf?600:50);
+}
+
+function vReports(){
+  if(!S.classes.length) return emptyData();
+  if(!rp.cls||!cls(rp.cls)) rp.cls=homeClass&&cls(homeClass)?homeClass:S.classes[0].id;
+  const studs=classStudents(rp.cls); if(rp.type==="student"&&!studs.some(s=>s.id===rp.stu)) rp.stu=studs[0]?studs[0].id:"";
+  const R=rpRange();
+  const T=[["class","تقرير قسم"],["student","تقرير تلميذ"],["school","تقرير المؤسسة"],["warn","الإنذارات والاستدعاءات"]];
+  const RG=[["day","يوم"],["week","أسبوع"],["month","شهر"],["term","فصل"],["year","سنة"],["custom","فترة مخصصة"]];
+  const set=(k,v)=>`rp.${k}=${v};zoom=0;render()`;
+  const form=`<div class="card noprint"><h2>التقارير</h2>
+    <div class="segs" style="margin-bottom:10px">${T.map(([k,t])=>`<button class="${rp.type===k?"on":""}" onclick="${set("type","'"+k+"'")}">${t}</button>`).join("")}</div>
+    <div class="segs" style="margin-bottom:10px">${RG.map(([k,t])=>`<button class="${rp.range===k?"on":""}" onclick="${set("range","'"+k+"'")}">${t}</button>`).join("")}</div>
+    <div class="row" style="align-items:end">
+      ${rp.range==="day"||rp.range==="week"?`<label class="f" style="margin:0">${rp.range==="week"?"يوم من الأسبوع":"اليوم"}<input type="date" value="${rp.date}" onchange="rp.date=this.value;render()"></label>`:""}
+      ${rp.range==="month"?`<label class="f" style="margin:0">الشهر<input type="month" value="${rp.month}" onchange="rp.month=this.value;render()"></label>`:""}
+      ${rp.range==="term"?`<label class="f" style="margin:0">الفصل<select onchange="rp.term=Number(this.value);render()">${(S.cfg.terms||[]).map((t,i)=>`<option value="${i}" ${i===rp.term?"selected":""}>${esc(t.name)}</option>`).join("")}</select></label>`:""}
+      ${rp.range==="custom"?`<label class="f" style="margin:0">من<input type="date" value="${rp.from}" onchange="rp.from=this.value;render()"></label><label class="f" style="margin:0">إلى<input type="date" value="${rp.to}" onchange="rp.to=this.value;render()"></label>`:""}
+      ${rp.type==="class"||rp.type==="student"?`<label class="f" style="margin:0">القسم<select onchange="rp.cls=this.value;render()">${S.classes.slice().sort((a,b)=>a.name.localeCompare(b.name,"ar",{numeric:true})).map(c=>`<option value="${c.id}" ${c.id===rp.cls?"selected":""}>${esc(c.name)}</option>`).join("")}</select></label>`:""}
+      ${rp.type==="student"?`<label class="f" style="margin:0">التلميذ<select onchange="rp.stu=this.value;render()">${studs.map((s,i)=>`<option value="${s.id}" ${s.id===rp.stu?"selected":""}>${i+1}. ${esc(s.name)}</option>`).join("")}</select></label>`:""}
+      ${rp.type==="class"?`<label class="switch" style="margin:0;flex:0 0 auto"><input type="checkbox" ${rp.only?"checked":""} onchange="rp.only=this.checked;render()"> الغائبون فقط</label>`:""}
+    </div></div>`;
+  const body=({class:repClass,student:repStudent,school:repSchool,warn:repWarn}[rp.type])(R);
+  return form+flashHTML()+docTools(null,rp.type==="student")+docWrap(body,rp.type==="student");
+}
+function repClass(R){
+  const c=cls(rp.cls), st=classStats(c.id,R), studs=classStudents(c.id);
+  const rows=studs.map(s=>({s,x:stuStats(s.id,st.abs)})).filter(r=>!rp.only||r.x.n);
+  const bySub={}; st.abs.forEach(a=>{ bySub[a.subject]=(bySub[a.subject]||0)+1; });
+  const short=(hmMin("00:00"),(new Date(R[1])-new Date(R[0]))/86400000<=7);
+  const sessList=st.sess.slice().sort((a,b)=>(a.date+a.from).localeCompare(b.date+b.from));
+  return `${docHead("تقرير غيابات القسم",R[2])}
+    <table class="sinfo"><tr><th>القسم</th><td>${esc(c.name)}</td><th>عدد التلاميذ</th><td>${studs.length}</td><th>الحصص المسجّلة</th><td>${st.sess.length}</td></tr></table>
+    <div class="sstats"><div class="r"><b>${st.abs.length}</b>مجموع الغيابات (حصة)</div><div><b>${fmtH(st.hours)}</b>ساعات الغياب</div><div class="r"><b>${fmtH(st.unjHours)}</b>ساعات غير مبررة</div><div class="g"><b>${st.rate}%</b>نسبة الحضور</div></div>
+    <h3 class="sec">الغياب حسب التلميذ</h3>
+    <table><thead><tr><th>#</th><th>الاسم واللقب</th><th>الرقم</th><th>عدد الغيابات</th><th>الساعات</th><th>أيام الغياب</th><th>مبرر</th><th>غير مبرر (سا)</th><th>آخر غياب</th><th>ملاحظة</th></tr></thead>
+    ${rows.map((r,i)=>`<tr class="${r.x.n?wClass(r.x.unjH):"zero"}"><td>${studs.indexOf(r.s)+1}</td><td>${esc(r.s.name)}</td><td>${esc(r.s.code)}</td><td>${r.x.n}</td><td>${fmtH(r.x.h)}</td><td>${r.x.days}</td><td>${r.x.just}</td><td>${fmtH(r.x.unjH)}</td><td>${r.x.last?fmtDate(r.x.last):"—"}</td><td>${wLabel(r.x.unjH)}</td></tr>`).join("")||`<tr><td colspan="10">لا توجد غيابات.</td></tr>`}</table>
+    ${Object.keys(bySub).length?`<h3 class="sec">الغياب حسب المادة</h3><table><thead><tr>${Object.keys(bySub).map(k=>`<th>${esc(k)}</th>`).join("")}</tr></thead><tr>${Object.values(bySub).map(v=>`<td style="text-align:center">${v}</td>`).join("")}</tr></table>`:""}
+    ${short&&sessList.length?`<h3 class="sec">تفصيل الحصص</h3><table><thead><tr><th>التاريخ</th><th>التوقيت</th><th>المادة</th><th>الأستاذ(ة)</th><th>الغائبون</th></tr></thead>
+      ${sessList.map(x=>{ const ab=st.abs.filter(a=>a.sessionId===x.id); return `<tr><td>${DAY_NAMES[new Date(x.date+"T12:00:00").getDay()]} ${fmtDate(x.date)}</td><td>${x.from}–${x.to}</td><td>${esc(x.subject)}</td><td>${esc(x.teacher)}</td><td>${ab.length?`<b>${ab.length}:</b> ${ab.map(a=>esc(a.studentName)).join("، ")}`:"—"}</td></tr>`; }).join("")}</table>`:""}
+    ${docSign()}`;
+}
+function repStudent(R){
+  const s=S.students.find(x=>x.id===rp.stu); if(!s) return `<p>لا يوجد تلاميذ في هذا القسم.</p>`;
+  const c=cls(s.classId), abs=S.absences.filter(a=>a.studentId===s.id&&inR(a.date,R)).sort((a,b)=>(a.date+a.from).localeCompare(b.date+b.from)), x=stuStats(s.id,abs);
+  const st={sent:"أُعلم",waiting:"في الانتظار",hold:"لم يُرسل",sending:"جارٍ",failed:"لم يُعلم"};
+  return `${docHead("بطاقة غيابات تلميذ",R[2])}
+    <table class="sinfo"><tr><th>التلميذ(ة)</th><td><b>${esc(s.name)}</b></td><th>الرقم</th><td>${esc(s.code)}</td></tr><tr><th>القسم</th><td>${esc(c?c.name:"")}</td><th>الولي</th><td>${esc(s.parent||"")} ${s.phone?"— "+esc(s.phone):""}</td></tr></table>
+    <div class="sstats"><div class="r"><b>${x.n}</b>عدد الغيابات</div><div><b>${fmtH(x.h)}</b>الساعات</div><div class="g"><b>${x.just}</b>مبررة</div><div class="r"><b>${fmtH(x.unjH)}</b>ساعات غير مبررة</div></div>
+    ${wLabel(x.unjH)?`<p style="text-align:center;font-weight:700;color:#c0392b">⚠ تجاوز حد «${wLabel(x.unjH)}»</p>`:""}
+    <table><thead><tr><th>#</th><th>اليوم والتاريخ</th><th>التوقيت</th><th>المادة</th><th>الأستاذ(ة)</th><th>التبرير</th><th>إعلام الولي</th></tr></thead>
+    ${abs.map((a,i)=>`<tr><td>${i+1}</td><td>${DAY_NAMES[new Date(a.date+"T12:00:00").getDay()]} ${fmtDate(a.date)}</td><td>${a.from}–${a.to}</td><td>${esc(a.subject)}</td><td>${esc(a.teacher)}</td>
+      <td>${a.justified?`مبرر${a.reason?" — "+esc(a.reason):""}`:"غير مبرر"} <button class="jbtn noprint" onclick="justify('${a.id}')">${a.justified?"تعديل":"تبرير"}</button></td><td>${st[a.status]||""}</td></tr>`).join("")||`<tr><td colspan="7">لا توجد غيابات في هذه الفترة.</td></tr>`}</table>
+    ${docSign()}
+    <div class="noprint" style="margin-top:10px;text-align:center"><button class="btn ghost sm" onclick="openLetter('${s.id}')">✉️ استدعاء الولي</button></div>`;
+}
+function repSchool(R){
+  const rows=S.classes.slice().sort((a,b)=>a.name.localeCompare(b.name,"ar",{numeric:true})).map(c=>({c,st:classStats(c.id,R),n:classStudents(c.id).length}));
+  const all=S.absences.filter(a=>inR(a.date,R));
+  const tot=rows.reduce((o,r)=>({abs:o.abs+r.st.abs.length,h:o.h+r.st.hours,u:o.u+r.st.unjHours,s:o.s+r.st.sess.length,n:o.n+r.n}),{abs:0,h:0,u:0,s:0,n:0});
+  const per={}; all.forEach(a=>{ per[a.studentId]=(per[a.studentId]||0)+absHours(a); });
+  const top=Object.entries(per).sort((a,b)=>b[1]-a[1]).slice(0,15).map(([id,h])=>({s:S.students.find(x=>x.id===id),h})).filter(x=>x.s);
+  return `${docHead("تقرير غيابات المؤسسة",R[2])}
+    <div class="sstats"><div><b>${tot.n}</b>عدد التلاميذ</div><div><b>${tot.s}</b>الحصص المسجّلة</div><div class="r"><b>${tot.abs}</b>مجموع الغيابات</div><div class="r"><b>${fmtH(tot.u)}</b>ساعات غير مبررة</div></div>
+    <h3 class="sec">حسب القسم</h3>
+    <table><thead><tr><th>القسم</th><th>التلاميذ</th><th>الحصص المسجّلة</th><th>الغيابات</th><th>الساعات</th><th>غير مبرر (سا)</th><th>نسبة الحضور</th></tr></thead>
+    ${rows.map(r=>`<tr><td>${esc(r.c.name)}</td><td>${r.n}</td><td>${r.st.sess.length}</td><td>${r.st.abs.length}</td><td>${fmtH(r.st.hours)}</td><td>${fmtH(r.st.unjHours)}</td><td>${r.st.rate}%</td></tr>`).join("")}
+    <tr><th>المجموع</th><th>${tot.n}</th><th>${tot.s}</th><th>${tot.abs}</th><th>${fmtH(tot.h)}</th><th>${fmtH(tot.u)}</th><th></th></tr></table>
+    ${top.length?`<h3 class="sec">التلاميذ الأكثر غياباً</h3><table><thead><tr><th>#</th><th>التلميذ(ة)</th><th>القسم</th><th>ساعات الغياب</th></tr></thead>${top.map((x,i)=>`<tr><td>${i+1}</td><td>${esc(x.s.name)}</td><td>${esc((cls(x.s.classId)||{}).name||"")}</td><td>${fmtH(x.h)}</td></tr>`).join("")}</table>`:""}
+    ${docSign()}`;
+}
+function repWarn(R){
+  const abs=S.absences.filter(a=>inR(a.date,R)&&!a.justified);
+  const per={}; abs.forEach(a=>{ per[a.studentId]=(per[a.studentId]||0)+absHours(a); });
+  const list=Object.entries(per).filter(([,h])=>h>=S.cfg.warn1).sort((a,b)=>b[1]-a[1]).map(([id,h])=>({s:S.students.find(x=>x.id===id),h})).filter(x=>x.s);
+  return `${docHead("قائمة الإنذارات والاستدعاءات",R[2])}
+    <p style="text-align:center">الغياب غير المبرر: استدعاء الولي ابتداءً من <b>${S.cfg.warn1}</b> ساعات، وإنذار كتابي ابتداءً من <b>${S.cfg.warn2}</b> ساعة (تُعدَّل من الإعدادات).</p>
+    <table><thead><tr><th>#</th><th>التلميذ(ة)</th><th>القسم</th><th>الولي</th><th>الهاتف</th><th>ساعات غير مبررة</th><th>الإجراء</th><th class="noprint"></th></tr></thead>
+    ${list.map((x,i)=>`<tr class="${wClass(x.h)}"><td>${i+1}</td><td>${esc(x.s.name)}</td><td>${esc((cls(x.s.classId)||{}).name||"")}</td><td>${esc(x.s.parent||"")}</td><td style="direction:ltr">${esc(x.s.phone||"")}</td><td>${fmtH(x.h)}</td><td><b>${wLabel(x.h)}</b></td>
+      <td class="noprint"><button class="jbtn" onclick="openLetter('${x.s.id}')">✉️ استدعاء</button></td></tr>`).join("")||`<tr><td colspan="8">لا يوجد تلاميذ تجاوزوا الحدود في هذه الفترة 👍</td></tr>`}</table>
+    ${docSign()}`;
+}
+function justify(id){
+  const a=S.absences.find(x=>x.id===id);
+  const reasons=["مرض (شهادة طبية)","ظرف عائلي","موعد إداري","نشاط رسمي للمؤسسة","تأخر مبرر","أخرى"];
+  document.getElementById("modal").innerHTML=`<div class="overlay" onclick="if(event.target===this)closeModal()"><div class="dialog"><h2 style="margin-top:0">تبرير غياب ${esc(a.studentName)}</h2>
+    <p class="muted">${fmtDate(a.date)} · ${a.from}–${a.to} · ${esc(a.subject)}</p>
+    <label class="switch"><input type="checkbox" id="jOk" ${a.justified?"checked":""}> الغياب مبرر</label>
+    <label class="f">السبب<input id="jWhy" list="jList" value="${esc(a.reason||"")}"></label><datalist id="jList">${reasons.map(r=>`<option value="${r}">`).join("")}</datalist>
+    <label class="switch" style="font-weight:400"><input type="checkbox" id="jDay"> تطبيق على كل غيابات هذا التلميذ في نفس اليوم</label>
+    <div class="row"><button class="btn" id="jSave">حفظ</button><button class="btn ghost" onclick="closeModal()">إلغاء</button></div></div></div>`;
+  document.getElementById("jSave").onclick=()=>{ const ok=document.getElementById("jOk").checked, why=document.getElementById("jWhy").value.trim(), day=document.getElementById("jDay").checked;
+    S.absences.forEach(x=>{ if(x.id===id||(day&&x.studentId===a.studentId&&x.date===a.date)){ x.justified=ok; x.reason=ok?why:""; } }); saveLocal(); closeModal(); render(); };
+}
+/* --- استدعاء الولي --- */
+let letterStu=null, letterDate=addDays(todayStr(),2), letterTime="09:00";
+function openLetter(id){ letterStu=id; zoom=0; view="letter"; render(); window.scrollTo(0,0); }
+function vLetter(){
+  const s=S.students.find(x=>x.id===letterStu); if(!s){ view="reports"; return vReports(); }
+  const c=cls(s.classId), R=rpRange(), x=stuStats(s.id,S.absences.filter(a=>a.studentId===s.id&&inR(a.date,R)));
+  const msg=`${S.cfg.school}: يرجى من ولي التلميذ(ة) ${s.name} الحضور إلى المؤسسة يوم ${fmtDate(letterDate)} على الساعة ${letterTime} بخصوص غياباته.`;
+  const ph=intlPhone(s.phone);
+  return `<div class="card noprint"><h2>استدعاء ولي ${esc(s.name)}</h2><div class="row" style="align-items:end">
+      <label class="f" style="margin:0">يوم الحضور<input type="date" value="${letterDate}" onchange="letterDate=this.value;render()"></label>
+      <label class="f" style="margin:0">الساعة<input type="time" value="${letterTime}" onchange="letterTime=this.value;render()"></label>
+      ${ph?`<button class="btn ghost" style="flex:0 0 auto" onclick='sendConvSms(${JSON.stringify(s.phone)},${JSON.stringify(msg)})'>📱 إرسال الاستدعاء SMS</button>`:""}
+    </div></div>
+    ${docTools("reports",true)}
+    ${docWrap(`${docHead("استدعاء ولي تلميذ","")}
+      <div class="letter">
+        <p>إلى السيد(ة) ولي التلميذ(ة): <b>${esc(s.name)}</b> — القسم: <b>${esc(c?c.name:"")}</b> — الرقم: ${esc(s.code)}</p>
+        <p>تحية طيبة وبعد،</p>
+        <p>نعلمكم أن ابنكم/ابنتكم سجّل(ت) خلال ${esc(R[2])} <b>${x.n}</b> غياباً، منها <b>${fmtH(x.unjH)}</b> ساعة غير مبررة.</p>
+        <p>لذا يرجى منكم الحضور إلى المؤسسة يوم <b>${DAY_NAMES[new Date(letterDate+"T12:00:00").getDay()]} ${fmtDate(letterDate)}</b> على الساعة <b>${letterTime}</b> لمقابلة ${S.cfg.counselor?"مستشار(ة) التربية السيد(ة) "+esc(S.cfg.counselor):"مستشار(ة) التربية"}، مصطحبين معكم ما يبرر هذه الغيابات إن وُجد.</p>
+        <p>وفي انتظار حضوركم تقبلوا منا فائق الاحترام والتقدير.</p>
+        <p style="text-align:left">${esc(S.cfg.commune||"")} في: ${fmtDate(todayStr())}</p>
+      </div>${docSign()}
+      <div style="border-top:1px dashed #999;margin-top:26px;padding-top:10px;font-size:13px">قسيمة تُعاد إلى المؤسسة: أنا الممضي أسفله ولي التلميذ(ة) ${esc(s.name)} اطلعت على الاستدعاء. &nbsp;&nbsp; الإمضاء: ......................</div>`,true)}`;
+}
+async function sendConvSms(phone,msg){
+  const ph=intlPhone(phone); const pl=smsPlugin();
+  if(IS_APP&&pl){ try{ const sim=pickSim(phone); await pl.send({phone:"+"+ph,message:msg,...(sim!=null?{subscriptionId:sim}:{})}); toast("أُرسل الاستدعاء ✓"); }catch(e){ toast("فشل الإرسال: "+((e&&e.message)||e),true); } }
+  else { location.href=`sms:+${ph}?body=${encodeURIComponent(msg)}`; }
+}
+
+/* ============ Excel: قراءة وكتابة xlsx بدون مكتبات (و xls عبر SheetJS) ============ */
+const XL={
+  async unzip(buf){
+    const dv=new DataView(buf); let e=-1;
+    for(let i=buf.byteLength-22;i>=Math.max(0,buf.byteLength-65557);i--) if(dv.getUint32(i,true)===0x06054b50){e=i;break;}
+    if(e<0) throw new Error("zip");
+    const n=dv.getUint16(e+10,true); let off=dv.getUint32(e+16,true); const out={};
+    for(let k=0;k<n;k++){ if(dv.getUint32(off,true)!==0x02014b50) break;
+      const method=dv.getUint16(off+10,true), cs=dv.getUint32(off+20,true), nl=dv.getUint16(off+28,true), el=dv.getUint16(off+30,true), cl=dv.getUint16(off+32,true), lh=dv.getUint32(off+42,true);
+      const name=new TextDecoder().decode(new Uint8Array(buf,off+46,nl));
+      const start=lh+30+dv.getUint16(lh+26,true)+dv.getUint16(lh+28,true);
+      out[name]={method,data:new Uint8Array(buf,start,cs)}; off+=46+nl+el+cl; }
+    return out;
+  },
+  async text(z,name){ const f=z[name]; if(!f) return null; let d=f.data;
+    if(f.method===8){ const st=new Blob([d]).stream().pipeThrough(new DecompressionStream("deflate-raw")); d=new Uint8Array(await new Response(st).arrayBuffer()); }
+    return new TextDecoder().decode(d); },
+  async readXlsx(buf){
+    const z=await XL.unzip(buf), P=t=>new DOMParser().parseFromString(t,"application/xml"), T=(el,tag)=>[...el.getElementsByTagNameNS("*",tag)];
+    const wb=P(await XL.text(z,"xl/workbook.xml")), rels=P(await XL.text(z,"xl/_rels/workbook.xml.rels"));
+    const relMap={}; T(rels,"Relationship").forEach(r=>relMap[r.getAttribute("Id")]=r.getAttribute("Target"));
+    const ssT=await XL.text(z,"xl/sharedStrings.xml"); const ss=ssT?T(P(ssT),"si").map(si=>T(si,"t").map(t=>t.textContent).join("")):[];
+    const col=r=>{ let n=0; for(const ch of r.replace(/\d+/g,"")) n=n*26+ch.charCodeAt(0)-64; return n-1; };
+    const sheets=[];
+    for(const sh of T(wb,"sheet")){
+      const rid=sh.getAttribute("r:id")||sh.getAttributeNS("http://schemas.openxmlformats.org/officeDocument/2006/relationships","id");
+      let tg=relMap[rid]||""; tg=tg.replace(/^\/?xl\//,"").replace(/^\//,""); const x=await XL.text(z,"xl/"+tg); if(!x) continue;
+      const rows=[]; T(P(x),"row").forEach(row=>{ const r=[]; T(row,"c").forEach(c=>{ const t=c.getAttribute("t"); const v=T(c,"v")[0]; let val="";
+          if(t==="s") val=ss[+(v&&v.textContent)]||""; else if(t==="inlineStr") val=T(c,"t").map(x=>x.textContent).join(""); else val=v?v.textContent:"";
+          r[col(c.getAttribute("r")||"A1")]=val; });
+        rows[(+row.getAttribute("r")||rows.length+1)-1]=Array.from(r,v=>v==null?"":String(v)); });
+      sheets.push({name:sh.getAttribute("name"),rows:Array.from(rows,r=>r||[])});
+    }
+    return sheets;
+  },
+  readCsv(t){ t=t.replace(/^﻿/,""); const first=t.split("\n")[0]; const sep=[",",";","\t"].map(c=>[c,first.split(c).length]).sort((a,b)=>b[1]-a[1])[0][0];
+    const rows=[]; let row=[],cur="",q=false;
+    for(let i=0;i<t.length;i++){ const ch=t[i];
+      if(q){ if(ch==='"'){ if(t[i+1]==='"'){cur+='"';i++;} else q=false; } else cur+=ch; }
+      else if(ch==='"') q=true; else if(ch===sep){ row.push(cur); cur=""; } else if(ch==="\n"){ row.push(cur.replace(/\r$/,"")); rows.push(row); row=[]; cur=""; } else cur+=ch; }
+    if(cur||row.length){ row.push(cur); rows.push(row); } return [{name:"Sheet1",rows}]; },
+  loadSheetJS(){ return new Promise((ok,no)=>{ if(window.XLSX) return ok(window.XLSX);
+    const tryLoad=(src,next)=>{ const sc=document.createElement("script"); sc.src=src; sc.onload=()=>window.XLSX?ok(window.XLSX):next(); sc.onerror=next; document.head.appendChild(sc); };
+    tryLoad("xlsx.full.min.js",()=>tryLoad("https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js",()=>no(new Error("xls")))); }); },
+  async readFile(f){
+    const ext=(f.name.split(".").pop()||"").toLowerCase(), buf=await f.arrayBuffer();
+    if(ext==="csv"||ext==="txt") return XL.readCsv(new TextDecoder().decode(buf));
+    if(ext==="xlsx"&&"DecompressionStream" in window){ try{ return await XL.readXlsx(buf); }catch(e){} }
+    try{ const X=await XL.loadSheetJS(); const wb=X.read(new Uint8Array(buf),{type:"array"});
+      return wb.SheetNames.map(n=>({name:n,rows:X.utils.sheet_to_json(wb.Sheets[n],{header:1,raw:false,defval:""}).map(r=>r.map(v=>String(v??"")))})); }
+    catch(e){ throw new Error(ext==="xls"?"تعذّرت قراءة ملف xls القديم بدون إنترنت. افتحه في Excel واحفظه بصيغة xlsx ثم أعد المحاولة.":"تعذّرت قراءة الملف"); }
+  },
+  crcT:null,
+  crc(u){ if(!XL.crcT){ XL.crcT=new Uint32Array(256); for(let n=0;n<256;n++){ let c=n; for(let k=0;k<8;k++) c=c&1?0xEDB88320^(c>>>1):c>>>1; XL.crcT[n]=c>>>0; } }
+    let c=0xFFFFFFFF; for(let i=0;i<u.length;i++) c=XL.crcT[(c^u[i])&255]^(c>>>8); return (c^0xFFFFFFFF)>>>0; },
+  zip(files){ const enc=new TextEncoder(), parts=[], cen=[]; let off=0;
+    files.forEach(f=>{ const nm=enc.encode(f.name), d=typeof f.data==="string"?enc.encode(f.data):f.data, crc=XL.crc(d);
+      const h=new DataView(new ArrayBuffer(30)); h.setUint32(0,0x04034b50,true); h.setUint16(4,20,true); h.setUint16(6,0x0800,true); h.setUint32(14,crc,true); h.setUint32(18,d.length,true); h.setUint32(22,d.length,true); h.setUint16(26,nm.length,true);
+      parts.push(new Uint8Array(h.buffer),nm,d);
+      const c=new DataView(new ArrayBuffer(46)); c.setUint32(0,0x02014b50,true); c.setUint16(4,20,true); c.setUint16(6,20,true); c.setUint16(8,0x0800,true); c.setUint32(16,crc,true); c.setUint32(20,d.length,true); c.setUint32(24,d.length,true); c.setUint16(28,nm.length,true); c.setUint32(42,off,true);
+      cen.push(new Uint8Array(c.buffer),nm); off+=30+nm.length+d.length; });
+    const cs=cen.reduce((n,x)=>n+x.length,0), e=new DataView(new ArrayBuffer(22)); e.setUint32(0,0x06054b50,true); e.setUint16(8,files.length,true); e.setUint16(10,files.length,true); e.setUint32(12,cs,true); e.setUint32(16,off,true);
+    return new Blob([...parts,...cen,new Uint8Array(e.buffer)],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}); },
+  write(sheets){
+    const x=v=>String(v??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])).replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g,"");
+    const cn=i=>{ let s=""; i++; while(i){ const m=(i-1)%26; s=String.fromCharCode(65+m)+s; i=Math.floor((i-1)/26);} return s; };
+    const used=new Set(); const names=sheets.map(sh=>{ let n=String(sh.name||"Sheet").replace(/[\[\]\*\?\/\\:]/g," ").slice(0,31).trim()||"Sheet"; let k=2,b=n; while(used.has(n)) n=(b.slice(0,28)+" "+k++); used.add(n); return n; });
+    const NS='xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"', XH='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>', R='http://schemas.openxmlformats.org/officeDocument/2006/relationships';
+    const files=[
+      {name:"[Content_Types].xml",data:`${XH}<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>${sheets.map((_,i)=>`<Override PartName="/xl/worksheets/sheet${i+1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`).join("")}</Types>`},
+      {name:"_rels/.rels",data:`${XH}<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="${R}/officeDocument" Target="xl/workbook.xml"/></Relationships>`},
+      {name:"xl/workbook.xml",data:`${XH}<workbook ${NS} xmlns:r="${R}"><bookViews><workbookView/></bookViews><sheets>${names.map((n,i)=>`<sheet name="${x(n)}" sheetId="${i+1}" r:id="rId${i+1}"/>`).join("")}</sheets></workbook>`},
+      {name:"xl/_rels/workbook.xml.rels",data:`${XH}<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${sheets.map((_,i)=>`<Relationship Id="rId${i+1}" Type="${R}/worksheet" Target="worksheets/sheet${i+1}.xml"/>`).join("")}<Relationship Id="rId${sheets.length+1}" Type="${R}/styles" Target="styles.xml"/></Relationships>`},
+      {name:"xl/styles.xml",data:`${XH}<styleSheet ${NS}><fonts count="2"><font><sz val="11"/><name val="Arial"/></font><font><b/><sz val="11"/><name val="Arial"/></font></fonts><fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FFE8F3EE"/></patternFill></fill></fills><borders count="2"><border/><border><left style="thin"/><right style="thin"/><top style="thin"/><bottom style="thin"/></border></borders><cellStyleXfs count="1"><xf/></cellStyleXfs><cellXfs count="3"><xf/><xf fontId="1" fillId="2" borderId="1" applyFont="1" applyFill="1" applyBorder="1"/><xf borderId="1" applyBorder="1"/></cellXfs></styleSheet>`},
+      ...sheets.map((sh,i)=>({name:`xl/worksheets/sheet${i+1}.xml`,data:`${XH}<worksheet ${NS}><sheetViews><sheetView rightToLeft="1" workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>${sh.widths?`<cols>${sh.widths.map((w,j)=>`<col min="${j+1}" max="${j+1}" width="${w}" customWidth="1"/>`).join("")}</cols>`:""}<sheetData>${sh.rows.map((r,ri)=>`<row r="${ri+1}">${r.map((v,ci)=>{ const ref=cn(ci)+(ri+1), st=ri===0?1:2;
+          return typeof v==="number"&&isFinite(v)?`<c r="${ref}" s="${st}"><v>${v}</v></c>`:`<c r="${ref}" s="${st}" t="inlineStr"><is><t xml:space="preserve">${x(v)}</t></is></c>`; }).join("")}</row>`).join("")}</sheetData></worksheet>`})),
+    ];
+    return XL.zip(files);
+  },
+};
+async function saveBlob(blob,name){
+  name=name.replace(/[\/\\:*?"<>|]/g,"-");
+  const pl=smsPlugin();
+  if(IS_APP&&pl&&pl.saveFile){
+    const b64=await new Promise(r=>{ const fr=new FileReader(); fr.onload=()=>r(String(fr.result).split(",")[1]); fr.readAsDataURL(blob); });
+    try{ const r=await pl.saveFile({name,base64:b64,mime:blob.type||"application/octet-stream"}); toast("✓ حُفظ الملف في: "+r.path); }catch(e){ toast("تعذّر الحفظ: "+((e&&e.message)||e),true); }
+    return;
+  }
+  const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download=name; document.body.appendChild(a); a.click(); setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},2000);
+}
+/* --- استيراد الأقسام والتلاميذ من Excel --- */
+const COLS={full:/الاسم\s*و\s*اللقب|اللقب\s*و\s*الاسم|الاسم الكامل|اسم التلميذ|^التلميذ|nom\s*(et|&)\s*pr[ée]nom/i,last:/^\s*(اللقب|nom)\s*$/i,first:/^\s*(الاسم|pr[ée]nom)\s*$/i,
+  phone:/هاتف|الهاتف|جوال|نقال|t[ée]l|phone|mobile/i,parent:/الولي|ولي الأمر|الأب|parent|tuteur/i,cls:/^\s*(القسم|الفوج|classe|groupe)/i,level:/المستوى|السنة|niveau/i};
+function detectCols(rows){
+  for(let h=0;h<Math.min(12,rows.length);h++){ const r=rows[h]||[]; const m={};
+    r.forEach((v,i)=>{ v=String(v||"").trim(); if(!v) return; for(const k of Object.keys(COLS)) if(m[k]==null&&COLS[k].test(v)){ m[k]=i; break; } });
+    if(m.full!=null||(m.last!=null&&m.first!=null)||(Object.keys(m).length>=2&&(m.first!=null||m.last!=null))) return {head:h,m};
+  }
+  return {head:-1,m:{full:0,parent:1,phone:2}};
+}
+function fixPhone(v){ let d=String(v||"").replace(/[^\d+]/g,""); if(/^[567]\d{8}$/.test(d)) d="0"+d; if(/^\+?213[567]\d{8}$/.test(d)) d="0"+d.replace("+","").slice(3); return d; }
+let imp=null;
+async function importExcel(inp){
+  const f=inp.files&&inp.files[0]; inp.value=""; if(!f) return;
+  try{
+    const sheets=(await XL.readFile(f)).filter(sh=>sh.rows.some(r=>r.some(v=>String(v).trim())));
+    const parsed=sheets.map(sh=>{ const {head,m}=detectCols(sh.rows); const rows=sh.rows.slice(head+1).map(r=>{
+        const g=k=>m[k]!=null?String(r[m[k]]||"").trim():"";
+        const name=(g("full")||[g("last"),g("first")].filter(Boolean).join(" ")).replace(/\s+/g," ").trim();
+        return {name,parent:g("parent"),phone:fixPhone(g("phone")),cls:g("cls"),level:g("level")}; }).filter(r=>r.name&&!/^\d+$/.test(r.name));
+      return {name:sh.name,m,rows}; }).filter(x=>x.rows.length);
+    if(!parsed.length) return toast("لم يُعثر على أسماء تلاميذ في الملف",true);
+    const hasCls=parsed.some(p=>p.rows.some(r=>r.cls));
+    imp={file:f.name,parsed,mode:hasCls?"col":parsed.length>1?"sheet":(selClass&&cls(selClass)?"sel":"sheet")};
+    impDialog();
+  }catch(e){ toast(e.message||"تعذّرت قراءة الملف",true); }
+}
+function guessLevel(name){ const lv=levelsFor(S.cfg.schoolType); const m=String(name).match(/([1-5])/); if(m){ const f=lv.find(l=>l.startsWith(m[1]+" ")); if(f) return f; } return lv[0]; }
+function impGroups(){
+  const g={};
+  imp.parsed.forEach(p=>p.rows.forEach(r=>{ const key=imp.mode==="col"?(r.cls||p.name):imp.mode==="sheet"?p.name:"__sel"; (g[key]=g[key]||{rows:[],level:r.level}).rows.push(r); }));
+  return g;
+}
+const findClassByName=k=>S.classes.find(c=>c.name===k||shortClass(c)===k||c.name.replace(/\s+/g,"")===String(k).replace(/\s+/g,""));
+function impDialog(){
+  const g=impGroups(), total=Object.values(g).reduce((n,x)=>n+x.rows.length,0), keys=Object.keys(g);
+  const lab={full:"الاسم واللقب",last:"اللقب",first:"الاسم",parent:"الولي",phone:"الهاتف",cls:"القسم",level:"المستوى"};
+  const m=imp.parsed[0].m;
+  document.getElementById("modal").innerHTML=`<div class="overlay"><div class="dialog" style="max-width:640px">
+    <h2 style="margin-top:0">استيراد من «${esc(imp.file)}»</h2>
+    <p class="muted" style="margin-top:0">الأعمدة المكتشفة: ${Object.keys(m).map(k=>`<span class="tag ok">${lab[k]}</span>`).join(" ")}</p>
+    <div class="f">توزيع التلاميذ على الأقسام</div>
+    ${imp.parsed.some(p=>p.rows.some(r=>r.cls))?`<label class="switch" style="font-weight:400"><input type="radio" name="im" ${imp.mode==="col"?"checked":""} onchange="imp.mode='col';impDialog()"> حسب عمود «القسم» في الملف</label>`:""}
+    <label class="switch" style="font-weight:400"><input type="radio" name="im" ${imp.mode==="sheet"?"checked":""} onchange="imp.mode='sheet';impDialog()"> كل ورقة في الملف = قسم (باسم الورقة)</label>
+    ${selClass&&cls(selClass)?`<label class="switch" style="font-weight:400"><input type="radio" name="im" ${imp.mode==="sel"?"checked":""} onchange="imp.mode='sel';impDialog()"> الكل إلى القسم المختار: <b>${esc(cls(selClass).name)}</b></label>`:""}
+    <table style="margin:8px 0"><tr><th>القسم</th><th>المستوى (للأقسام الجديدة)</th><th>التلاميذ</th></tr>
+      ${keys.map((k,i)=>{ const ex=k==="__sel"?cls(selClass):findClassByName(k);
+        return `<tr><td>${k==="__sel"?esc(cls(selClass).name):esc(k)} ${ex?'<span class="tag ok">موجود</span>':'<span class="tag amb">جديد</span>'}</td>
+          <td>${ex?"—":`<select id="impLv${i}">${levelsFor(S.cfg.schoolType).map(l=>`<option ${l===guessLevel(g[k].level||k)?"selected":""}>${l}</option>`).join("")}</select>`}</td>
+          <td>${g[k].rows.length}</td></tr>`; }).join("")}</table>
+    <p class="muted">أول الأسماء: ${esc(imp.parsed[0].rows.slice(0,4).map(r=>r.name+(r.phone?" ("+r.phone+")":"")).join("، "))}…</p>
+    <label class="switch" style="font-weight:400"><input type="checkbox" id="impSkip" checked> تجاهل التلاميذ الموجودين مسبقاً بنفس الاسم في نفس القسم</label>
+    <div class="row"><button class="btn" onclick="doImport()">استيراد ${total} تلميذ</button><button class="btn ghost" onclick="closeModal()">إلغاء</button></div></div></div>`;
+}
+function doImport(){
+  const g=impGroups(), keys=Object.keys(g), skip=document.getElementById("impSkip").checked;
+  const yy=String(new Date().getFullYear()).slice(2); let base=parseInt(nextCode().slice(2),10), added=0, newC=0, skipped=0;
+  keys.forEach((k,i)=>{
+    let c=k==="__sel"?cls(selClass):findClassByName(k);
+    if(!c){ const lvEl=document.getElementById("impLv"+i); const level=lvEl?lvEl.value:guessLevel(k); const nm=k.startsWith(level)?k:level+" — "+k;
+      c={id:uid(),level,name:nm,assign:{}}; S.classes.push(c); newC++; }
+    g[k].rows.forEach(r=>{ if(skip&&S.students.some(s=>s.classId===c.id&&s.name===r.name)){ skipped++; return; }
+      S.students.push({id:uid(),code:yy+String(base++).padStart(4,"0"),name:r.name,parent:r.parent,phone:r.phone,classId:c.id}); added++; });
+    if(!selClass||!cls(selClass)) selClass=c.id;
+  });
+  saveLocal(); closeModal(); toast(`✓ استُورد ${added} تلميذ${newC?` و${newC} قسم جديد`:""}${skipped?` (تُجوهل ${skipped} موجود)`:""}`);
+}
+function exportStudents(only){
+  const list=only?[cls(only)]:S.classes.slice().sort((a,b)=>a.name.localeCompare(b.name,"ar",{numeric:true}));
+  const sheets=list.map(c=>({name:c.name,widths:[5,10,30,26,15,10,24],rows:[["#","الرقم","الاسم واللقب","الولي","الهاتف","المتعامل","القسم"],
+    ...classStudents(c.id).map((s,i)=>[i+1,s.code,s.name,s.parent||"",s.phone||"",(OPS[operatorOf(s.phone)]||{}).name||"",c.name])]}));
+  saveBlob(XL.write(sheets),`تلاميذ-${only?cls(only).name:"كل-الأقسام"}-${todayStr()}.xlsx`);
+}
+function templateXlsx(){
+  saveBlob(XL.write([{name:"3 ثانوي — قسم 2",widths:[30,26,15,22],rows:[["الاسم واللقب","الولي","الهاتف","القسم"],["عبد الله سلطان","سلطان رشيد","0550123456","3 ثانوي — قسم 2"],["سلمى محمدي","محمدي كمال","0661234567","3 ثانوي — قسم 2"]]}]),"نموذج-قائمة-التلاميذ.xlsx");
+}
+// تصدير جداول التقرير المعروض إلى Excel
+function exportReportXlsx(){
+  const sh=document.querySelector(".sheet.flow"); if(!sh) return;
+  const tables=[...sh.querySelectorAll("table")];
+  const sheets=tables.map((t,i)=>{ let h=t.previousElementSibling; while(h&&h.tagName!=="H3") h=h.previousElementSibling;
+    return {name:h?h.textContent.trim():(t.classList.contains("sinfo")?"معلومات":"جدول "+(i+1)),
+      rows:[...t.querySelectorAll("tr")].map(tr=>[...tr.children].filter(td=>!td.classList.contains("noprint")).map(td=>{ const c=td.cloneNode(true); c.querySelectorAll(".noprint").forEach(n=>n.remove()); const v=c.textContent.replace(/\s+/g," ").trim(); return /^\d+$/.test(v)?Number(v):v; }))}; });
+  const title=(sh.querySelector(".sh-c h1")||{}).textContent||"تقرير";
+  saveBlob(XL.write(sheets),`${title}-${rpRange()[2]}.xlsx`);
 }
 
 /* ============ المواد والأساتذة وجدول التوقيت ============ */
@@ -1326,8 +1700,20 @@ function periodsCard(){
     <table><tr><th>#</th><th>من</th><th>إلى</th><th></th></tr>
     ${sortedPeriods().map((p,i)=>`<tr><td>${i+1}</td><td><input type="time" value="${p.from}" onchange="setPeriod('${p.id}','from',this.value)"></td><td><input type="time" value="${p.to}" onchange="setPeriod('${p.id}','to',this.value)"></td>
       <td><button class="btn ghost sm" onclick="delPeriod('${p.id}')">حذف</button></td></tr>`).join("")}</table>
-    <button class="btn ghost" style="margin-top:8px" onclick="addPeriod()">+ فترة</button></div>`;
+    <button class="btn ghost" style="margin-top:8px" onclick="addPeriod()">+ فترة</button></div>
+  <div class="card"><h2>الفصول الدراسية</h2>
+    <table><tr><th>الفصل</th><th>من</th><th>إلى</th><th></th></tr>
+    ${(S.cfg.terms||[]).map((t,i)=>`<tr><td><input value="${esc(t.name)}" onchange="setTerm(${i},'name',this.value)"></td><td><input type="date" value="${t.from}" onchange="setTerm(${i},'from',this.value)"></td><td><input type="date" value="${t.to}" onchange="setTerm(${i},'to',this.value)"></td>
+      <td><button class="btn ghost sm" onclick="saveCfg({...S.cfg,terms:S.cfg.terms.filter((_,j)=>j!==${i})})">حذف</button></td></tr>`).join("")}</table>
+    <button class="btn ghost" style="margin-top:8px" onclick="saveCfg({...S.cfg,terms:[...(S.cfg.terms||[]),{name:'فصل جديد',from:todayStr(),to:todayStr()}]})">+ فصل</button>
+    <p class="muted" style="margin-bottom:0">تواريخ الفصول تُستعمل في التقارير الفصلية. عدّلها حسب الرزنامة الرسمية للسنة الدراسية.</p></div>
+  <div class="card"><h2>حدود الغياب غير المبرر (بالساعات)</h2>
+    <div class="row">
+      <label class="f">استدعاء الولي عند<input type="number" min="1" value="${S.cfg.warn1}" onchange="saveCfg({...S.cfg,warn1:Number(this.value)||6})"></label>
+      <label class="f">إنذار كتابي عند<input type="number" min="1" value="${S.cfg.warn2}" onchange="saveCfg({...S.cfg,warn2:Number(this.value)||12})"></label>
+    </div><p class="muted" style="margin:0">تظهر في «التقارير ← الإنذارات والاستدعاءات» قائمة التلاميذ الذين تجاوزوا هذه الحدود.</p></div>`;
 }
+function setTerm(i,k,v){ const t=(S.cfg.terms||[]).map((x,j)=>j===i?{...x,[k]:v}:x); saveCfg({...S.cfg,terms:t}); }
 function toggleDay(d,on){ const s=new Set(S.cfg.days||[]); on?s.add(d):s.delete(d); saveCfg({...S.cfg,days:[...s]}); }
 function setPeriod(id,k,v){ if(!v) return; saveCfg({...S.cfg,periods:(S.cfg.periods||[]).map(p=>p.id===id?{...p,[k]:v}:p)}); }
 function addPeriod(){ const ps=sortedPeriods(); const last=ps[ps.length-1]; const from=last?last.to:"08:00"; saveCfg({...S.cfg,periods:[...(S.cfg.periods||[]),{id:uid(),from,to:addHM(from,60)}]}); }
@@ -1365,7 +1751,7 @@ async function seedDemo(){
 }
 
 /* ============ Boot ============ */
-window.addEventListener("resize",()=>{ if(view==="report"&&!zoom) render(); });
+window.addEventListener("resize",()=>{ if(["report","reports","letter"].includes(view)&&!zoom) render(); });
 render();
 if(IS_APP){ try{ const p=smsPlugin(); p&&p.keepAwake&&p.keepAwake(); }catch(e){} }
 let lastAct=-1;

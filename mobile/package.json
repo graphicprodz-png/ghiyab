@@ -6,7 +6,8 @@
   "dependencies": {
     "@capacitor/android": "^7.0.0",
     "@capacitor/core": "^7.0.0",
-    "ghiyab-sms-sender": "file:./plugins/sms-sender"
+    "ghiyab-sms-sender": "file:./plugins/sms-sender",
+    "xlsx": "0.18.5"
   },
   "devDependencies": {
     "@capacitor/assets": "^3.0.5",

@@ -37,6 +37,7 @@ jobs:
       - name: إنشاء مشروع أندرويد
         run: |
           cp node_modules/@capacitor/core/dist/capacitor.js www/capacitor.js || true
+          cp node_modules/xlsx/dist/xlsx.full.min.js www/xlsx.full.min.js || true
           npx cap add android
 
       - name: الأيقونة وشاشة البداية

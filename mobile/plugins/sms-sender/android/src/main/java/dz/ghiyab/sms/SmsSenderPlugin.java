@@ -10,6 +10,15 @@ import android.content.IntentFilter;
 import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.Environment;
+import android.provider.MediaStore;
+import android.content.ContentValues;
+import android.content.ContentResolver;
+import android.net.Uri;
+import android.util.Base64;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.OutputStream;
 import android.print.PrintAttributes;
 import android.print.PrintDocumentAdapter;
 import android.print.PrintManager;
@@ -137,6 +146,39 @@ public class SmsSenderPlugin extends Plugin {
                 call.reject("تعذّرت الطباعة: " + e.getMessage());
             }
         });
+    }
+
+    /** حفظ ملف (Excel، نسخة احتياطية...) في مجلد التنزيلات */
+    @PluginMethod
+    public void saveFile(PluginCall call) {
+        String name = call.getString("name", "ghiyab.bin");
+        String b64 = call.getString("base64", "");
+        String mime = call.getString("mime", "application/octet-stream");
+        try {
+            byte[] data = Base64.decode(b64, Base64.DEFAULT);
+            String path;
+            if (Build.VERSION.SDK_INT >= 29) {
+                ContentResolver res = getContext().getContentResolver();
+                ContentValues v = new ContentValues();
+                v.put(MediaStore.Downloads.DISPLAY_NAME, name);
+                v.put(MediaStore.Downloads.MIME_TYPE, mime);
+                v.put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS + "/Ghiyab");
+                Uri uri = res.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, v);
+                if (uri == null) throw new Exception("تعذّر إنشاء الملف");
+                try (OutputStream os = res.openOutputStream(uri)) { os.write(data); }
+                path = "Download/Ghiyab/" + name;
+            } else {
+                File dir = getContext().getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS);
+                File f = new File(dir, name);
+                try (FileOutputStream os = new FileOutputStream(f)) { os.write(data); }
+                path = f.getAbsolutePath();
+            }
+            JSObject r = new JSObject();
+            r.put("path", path);
+            call.resolve(r);
+        } catch (Exception e) {
+            call.reject("تعذّر حفظ الملف: " + e.getMessage());
+        }
     }
 
     @PluginMethod
