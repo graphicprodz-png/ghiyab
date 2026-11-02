@@ -372,7 +372,7 @@ const nowHM=()=>{const d=new Date();return String(d.getHours()).padStart(2,"0")+
 const addHM=(hm,min)=>{const[h,m]=hm.split(":").map(Number);const t=h*60+m+min;return String(Math.floor(t/60)%24).padStart(2,"0")+":"+String(t%60).padStart(2,"0")};
 const fmtDate=s=>{try{const[y,m,d]=s.split("-");return d+"/"+m+"/"+y}catch(e){return s}};
 const cls=id=>S.classes.find(c=>c.id===id);
-const stuByCode=code=>S.students.find(s=>s.code===String(code).trim());
+const stuByCode=code=>{ const v=normCode(code); return S.students.find(s=>String(s.code).toUpperCase()===v); };
 /* ============ المتعاملون: موبيليس، جيزي، أوريدو ============ */
 const OPS={mobilis:{name:"موبيليس",color:"#1f9d55",re:/mobilis|algerie\s*telecom|\bATM\b/i},djezzy:{name:"جيزي",color:"#c0392b",re:/djezzy|optimum/i},ooredoo:{name:"أوريدو",color:"#b7791f",re:/ooredoo|nedjma|wataniya/i}};
 function operatorOf(p){
@@ -430,7 +430,19 @@ function message(a){
 }
 
 /* ============ Code 39 barcode (SVG) ============ */
-const C39={"0":"nnnwwnwnn","1":"wnnwnnnnw","2":"nnwwnnnnw","3":"wnwwnnnnn","4":"nnnwwnnnw","5":"wnnwwnnnn","6":"nnwwwnnnn","7":"nnnwnnwnw","8":"wnnwnnwnn","9":"nnwwnnwnn","*":"nwnnwnwnn"};
+const C39={"0":"nnnwwnwnn","1":"wnnwnnnnw","2":"nnwwnnnnw","3":"wnwwnnnnn","4":"nnnwwnnnw","5":"wnnwwnnnn","6":"nnwwwnnnn","7":"nnnwnnwnw","8":"wnnwnnwnn","9":"nnwwnnwnn","*":"nwnnwnwnn",
+  A:"wnnnnwnnw",B:"nnwnnwnnw",C:"wnwnnwnnn",D:"nnnnwwnnw",E:"wnnnwwnnn",F:"nnwnwwnnn",G:"nnnnnwwnw",H:"wnnnnwwnn",I:"nnwnnwwnn",J:"nnnnwwwnn",
+  K:"wnnnnnnww",L:"nnwnnnnww",M:"wnwnnnnwn",N:"nnnnwnnww",O:"wnnnwnnwn",P:"nnwnwnnwn",Q:"nnnnnnwww",R:"wnnnnnwwn",S:"nnwnnnwwn",T:"nnnnwnwwn",
+  U:"wwnnnnnnw",V:"nwwnnnnnw",W:"wwwnnnnnn",X:"nwnnwnnnw",Y:"wwnnwnnnn",Z:"nwwnwnnnn","-":"nwnnnnwnw"};
+// رقم التلميذ: تحدده الإدارة (أرقام، حروف لاتينية، شرطة) أو يتولد تلقائياً
+const normCode=v=>String(v??"").trim().toUpperCase().replace(/\s+/g,"");
+const validCode=v=>/^[A-Z0-9-]{1,20}$/.test(v);
+const codeTaken=(v,exceptId)=>S.students.some(s=>s.id!==exceptId&&String(s.code).toUpperCase()===v);
+function setStudentCode(st,v){
+  const old=st.code; st.code=v;
+  notifRecs().forEach(a=>{ if(a.studentId===st.id) a.code=v; });
+  return old;
+}
 function barcodeSVG(code){
   const chars=("*"+code+"*").split(""); let x=10; const N=2,W=5,H=60; let rects="";
   chars.forEach((ch,ci)=>{
@@ -952,9 +964,10 @@ function vStudents(){
     </div></div>
   ${flashHTML()}
   ${c?`<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><h2 style="margin:0">${esc(c.name)} — ${list.length} تلميذ</h2>
-      <span class="row" style="flex:0 0 auto;gap:6px"><button class="btn ghost sm" onclick="openConsent('${c.id}')">🖨️ استمارات موافقة الأولياء</button><button class="btn red sm" onclick="askDelClass('${c.id}')">حذف القسم</button></span></div>
+      <span class="row" style="flex:0 0 auto;gap:6px"><button class="btn ghost sm" onclick="renumberDlg('${c.id}')">🔢 ترقيم التلاميذ</button><button class="btn ghost sm" onclick="openConsent('${c.id}')">🖨️ استمارات موافقة الأولياء</button><button class="btn red sm" onclick="askDelClass('${c.id}')">حذف القسم</button></span></div>
     <div class="row" style="align-items:end;margin-top:10px">
       <label class="f" style="margin:0">اسم التلميذ(ة)<input id="aName"></label>
+      <label class="f" style="margin:0;max-width:150px">الرقم (اختياري)<input id="aCode" style="direction:ltr" placeholder="تلقائي"></label>
       <label class="f" style="margin:0">اسم الولي<input id="aParent"></label>
       <label class="f" style="margin:0">هاتف الولي<input id="aPhone" inputmode="tel" placeholder="0550 12 34 56" style="direction:ltr"></label>
       <button class="btn" style="flex:0 0 auto" onclick="addStudent()">+ تلميذ</button>
@@ -976,7 +989,9 @@ function addClass(){
 }
 function addStudent(){
   const name=document.getElementById("aName").value.trim(); if(!name) return toast("أدخل اسم التلميذ",true);
-  put("students",{id:uid(),code:nextCode(),name,parent:document.getElementById("aParent").value.trim(),phone:document.getElementById("aPhone").value.trim(),classId:selClass});
+  let code=normCode(document.getElementById("aCode").value);
+  if(code){ if(!validCode(code)) return toast("الرقم: أرقام أو حروف لاتينية أو شرطة فقط",true); if(codeTaken(code)) return toast("الرقم "+code+" مستعمل لتلميذ آخر",true); }
+  put("students",{id:uid(),code:code||nextCode(),name,parent:document.getElementById("aParent").value.trim(),phone:document.getElementById("aPhone").value.trim(),classId:selClass});
   toast("أُضيف "+name);
 }
 async function bulkAdd(){
@@ -995,6 +1010,7 @@ function editStudent(id){
   document.getElementById("modal").innerHTML=`<div class="overlay" onclick="if(event.target===this)closeModal()"><div class="dialog">
     <h2 style="margin-top:0">تعديل التلميذ <span class="muted" style="direction:ltr;display:inline-block">${esc(s.code)}</span></h2>
     <label class="f">الاسم<input id="eName" value="${esc(s.name)}"></label>
+    <label class="f">رقم التلميذ (حسب الإدارة)<input id="eCode" value="${esc(s.code||"")}" style="direction:ltr" autocapitalize="characters"></label>
     <label class="f">اسم الولي<input id="eParent" value="${esc(s.parent||"")}"></label>
     <label class="f">هاتف الولي<input id="ePhone" value="${esc(s.phone||"")}" style="direction:ltr"></label>
     <label class="f">القسم<select id="eClass">${S.classes.map(c=>`<option value="${c.id}" ${c.id===s.classId?"selected":""}>${esc(c.name)}</option>`).join("")}</select></label>
@@ -1003,8 +1019,37 @@ function editStudent(id){
 }
 function saveStudent(id){
   const s=S.students.find(x=>x.id===id);
-  put("students",{...s,name:document.getElementById("eName").value.trim()||s.name,parent:document.getElementById("eParent").value.trim(),phone:document.getElementById("ePhone").value.trim(),classId:document.getElementById("eClass").value});
+  const code=normCode(document.getElementById("eCode").value);
+  if(code!==String(s.code).toUpperCase()){
+    if(!validCode(code)) return toast("الرقم: أرقام أو حروف لاتينية أو شرطة فقط (20 خانة على الأكثر)",true);
+    if(codeTaken(code,id)) return toast("الرقم "+code+" مستعمل لتلميذ آخر",true);
+    setStudentCode(s,code);
+  }
+  put("students",{...s,code,name:document.getElementById("eName").value.trim()||s.name,parent:document.getElementById("eParent").value.trim(),phone:document.getElementById("ePhone").value.trim(),classId:document.getElementById("eClass").value});
   closeModal();
+}
+function renumberDlg(cid){
+  const c=cls(cid), list=classStudents(cid);
+  document.getElementById("modal").innerHTML=`<div class="overlay" onclick="if(event.target===this)closeModal()"><div class="dialog">
+    <h2 style="margin-top:0">ترقيم تلاميذ ${esc(c.name)}</h2>
+    <p class="muted" style="margin-top:0">يُعطى لكل تلميذ رقم حسب ترتيب القائمة. يمكن أيضاً تعديل رقم أي تلميذ وحده من زر «تعديل». الغيابات السابقة تبقى مرتبطة بالتلميذ.</p>
+    <div class="row"><label class="f">بادئة (اختيارية)<input id="rnPre" style="direction:ltr" placeholder="مثال: 2S1-"></label>
+    <label class="f">أول رقم<input id="rnStart" type="number" min="0" value="1" style="direction:ltr"></label>
+    <label class="f">عدد الخانات<input id="rnPad" type="number" min="1" max="8" value="2" style="direction:ltr"></label></div>
+    <p class="muted" id="rnPrev"></p>
+    <div class="row"><button class="btn" onclick="doRenumber('${cid}')">ترقيم ${list.length} تلميذ</button><button class="btn ghost" onclick="closeModal()">إلغاء</button></div></div></div>`;
+  const prev=()=>{ const pre=normCode(document.getElementById("rnPre").value), st=Number(document.getElementById("rnStart").value)||0, pad=Number(document.getElementById("rnPad").value)||1;
+    document.getElementById("rnPrev").textContent="مثال: "+[0,1,2].map(i=>pre+String(st+i).padStart(pad,"0")).join("، ")+"…"; };
+  ["rnPre","rnStart","rnPad"].forEach(id=>document.getElementById(id).oninput=prev); prev();
+}
+function doRenumber(cid){
+  const pre=normCode(document.getElementById("rnPre").value), st=Number(document.getElementById("rnStart").value)||0, pad=Number(document.getElementById("rnPad").value)||1;
+  const list=classStudents(cid), ids=new Set(list.map(s=>s.id)), codes=list.map((s,i)=>pre+String(st+i).padStart(pad,"0"));
+  if(codes.some(c=>!validCode(c))) return toast("البادئة: حروف لاتينية أو أرقام أو شرطة فقط",true);
+  const clash=codes.find(c=>S.students.some(s=>!ids.has(s.id)&&String(s.code).toUpperCase()===c));
+  if(clash) return toast("الرقم "+clash+" مستعمل في قسم آخر — غيّر البادئة أو أول رقم",true);
+  list.forEach((s,i)=>setStudentCode(s,codes[i]));
+  saveLocal(); closeModal(); toast("✓ رُقّم "+list.length+" تلميذ"); render();
 }
 function delStudent(id){ del("students",id); closeModal(); }
 function askDelClass(id){
@@ -1827,7 +1872,7 @@ async function saveBlob(blob,name){
 }
 /* --- استيراد الأقسام والتلاميذ من Excel --- */
 const COLS={full:/الاسم\s*و\s*اللقب|اللقب\s*و\s*الاسم|الاسم الكامل|اسم التلميذ|اسم و لقب التلميذ|لقب و اسم التلميذ|^التلميذ|nom\s*(et|&)\s*pr[ée]nom/i,last:/^\s*(اللقب|nom)\s*$/i,first:/^\s*(الاسم|pr[ée]nom)\s*$/i,
-  phone:/هاتف|الهاتف|جوال|نقال|رقم الولي|t[ée]l|phone|mobile/i,parent:/الولي|ولي الأمر|الأب|parent|tuteur/i,cls:/^\s*(القسم|الفوج|classe|groupe)/i,level:/المستوى|السنة|niveau/i};
+  phone:/هاتف|الهاتف|جوال|نقال|رقم الولي|t[ée]l|phone|mobile/i,parent:/الولي|ولي الأمر|الأب|parent|tuteur/i,cls:/^\s*(القسم|الفوج|classe|groupe)/i,code:/^\s*(الرقم|رقم التلميذ|رقم التسجيل|رقم التعريف|رقم القيد|الرقم التعريفي|matricule|identifiant|n°\s*d?'?\s*inscription)/i,level:/المستوى|السنة|niveau/i};
 const normAr=v=>String(v||"").replace(/[إأآ]/g,"ا").replace(/ـ/g,"").replace(/\s+/g," ").trim();
 function detectCols(rows){
   // ملفات منصة الرقمنة وغيرها: العنوان قد يأخذ عدة أسطر قبل رأس الجدول
@@ -1847,7 +1892,7 @@ async function importExcel(inp){
         const g=k=>m[k]!=null?String(r[m[k]]||"").trim():"";
         const name=(g("full")||[g("last"),g("first")].filter(Boolean).join(" ")).replace(/\s+/g," ").trim();
         const hdr=COLS.full.test(normAr(g("full")))||COLS.last.test(normAr(g("last")))||COLS.first.test(normAr(g("first"))); // رأس جدول مكرر في ملفات متعددة الصفحات
-        return {name,hdr,parent:g("parent"),phone:fixPhone(g("phone")),cls:g("cls"),level:g("level")}; }).filter(r=>r.name&&!r.hdr&&!/^\d+$/.test(r.name));
+        return {name,hdr,code:normCode(g("code")),parent:g("parent"),phone:fixPhone(g("phone")),cls:g("cls"),level:g("level")}; }).filter(r=>r.name&&!r.hdr&&!/^\d+$/.test(r.name));
       return {name:sh.name,m,rows}; }).filter(x=>x.rows.length);
     if(!parsed.length) return toast("لم يُعثر على أسماء تلاميذ في الملف",true);
     const hasCls=parsed.some(p=>p.rows.some(r=>r.cls));
@@ -1864,7 +1909,7 @@ function impGroups(){
 const findClassByName=k=>S.classes.find(c=>c.name===k||shortClass(c)===k||c.name.replace(/\s+/g,"")===String(k).replace(/\s+/g,""));
 function impDialog(){
   const g=impGroups(), total=Object.values(g).reduce((n,x)=>n+x.rows.length,0), keys=Object.keys(g);
-  const lab={full:"الاسم واللقب",last:"اللقب",first:"الاسم",parent:"الولي",phone:"الهاتف",cls:"القسم",level:"المستوى"};
+  const lab={full:"الاسم واللقب",last:"اللقب",first:"الاسم",parent:"الولي",phone:"الهاتف",cls:"القسم",level:"المستوى",code:"رقم التلميذ"};
   const m=imp.parsed[0].m;
   document.getElementById("modal").innerHTML=`<div class="overlay"><div class="dialog" style="max-width:640px">
     <h2 style="margin-top:0">استيراد من «${esc(imp.file)}»</h2>
@@ -1879,21 +1924,27 @@ function impDialog(){
           <td>${ex?"—":`<select id="impLv${i}">${levelsFor(S.cfg.schoolType).map(l=>`<option ${l===guessLevel(g[k].level||k)?"selected":""}>${l}</option>`).join("")}</select>`}</td>
           <td>${g[k].rows.length}</td></tr>`; }).join("")}</table>
     <p class="muted">أول الأسماء: ${esc(imp.parsed[0].rows.slice(0,4).map(r=>r.name+(r.phone?" ("+r.phone+")":"")).join("، "))}…</p>
+    ${(()=>{ const codes=imp.parsed.flatMap(p=>p.rows.map(r=>r.code)).filter(Boolean); const seq=codes.length&&codes.every(c=>/^\d{1,3}$/.test(c));
+      return codes.length?`<label class="switch" style="font-weight:400"><input type="checkbox" id="impCode" ${seq?"":"checked"}> استعمال «رقم التلميذ» من الملف (${esc(codes.slice(0,3).join("، "))}…)${seq?' <span class="muted">— يبدو ترقيماً تسلسلياً للأسطر</span>':""}</label>`:""; })()}
     <label class="switch" style="font-weight:400"><input type="checkbox" id="impSkip" checked> تجاهل التلاميذ الموجودين مسبقاً بنفس الاسم في نفس القسم</label>
     <div class="row"><button class="btn" onclick="doImport()">استيراد ${total} تلميذ</button><button class="btn ghost" onclick="closeModal()">إلغاء</button></div></div></div>`;
 }
 function doImport(){
   const g=impGroups(), keys=Object.keys(g), skip=document.getElementById("impSkip").checked;
-  const yy=String(new Date().getFullYear()).slice(2); let base=parseInt(nextCode().slice(2),10), added=0, newC=0, skipped=0;
+  const yy=String(new Date().getFullYear()).slice(2); let base=parseInt(nextCode().slice(2),10), added=0, newC=0, skipped=0, badCode=0;
+  imp.useCode=!!(document.getElementById("impCode")||{}).checked;
   keys.forEach((k,i)=>{
     let c=k==="__sel"?cls(selClass):findClassByName(k);
     if(!c){ const lvEl=document.getElementById("impLv"+i); const level=lvEl?lvEl.value:guessLevel(k); const nm=k.startsWith(level)?k:level+" — "+k;
       c={id:uid(),level,name:nm,assign:{}}; S.classes.push(c); newC++; }
     g[k].rows.forEach(r=>{ if(skip&&S.students.some(s=>s.classId===c.id&&s.name===r.name)){ skipped++; return; }
-      S.students.push({id:uid(),code:yy+String(base++).padStart(4,"0"),name:r.name,parent:r.parent,phone:r.phone,classId:c.id}); added++; });
+      // رقم الإدارة من الملف إن وُجد (ويُتجاهل إذا كان مجرد ترقيم 1، 2، 3…)
+      let code=imp.useCode&&validCode(r.code)&&!codeTaken(r.code)?r.code:"";
+      if(!code){ if(imp.useCode&&r.code) badCode++; code=yy+String(base++).padStart(4,"0"); }
+      S.students.push({id:uid(),code,name:r.name,parent:r.parent,phone:r.phone,classId:c.id}); added++; });
     if(!selClass||!cls(selClass)) selClass=c.id;
   });
-  saveLocal(); closeModal(); toast(`✓ استُورد ${added} تلميذ${newC?` و${newC} قسم جديد`:""}${skipped?` (تُجوهل ${skipped} موجود)`:""}`);
+  saveLocal(); closeModal(); toast(`✓ استُورد ${added} تلميذ${newC?` و${newC} قسم جديد`:""}${skipped?` (تُجوهل ${skipped} موجود)`:""}${badCode?` — ${badCode} رقماً مكرراً أو غير صالح عُوّض برقم تلقائي`:""}`);
 }
 function exportStudents(only){
   const list=only?[cls(only)]:S.classes.slice().sort((a,b)=>a.name.localeCompare(b.name,"ar",{numeric:true}));
