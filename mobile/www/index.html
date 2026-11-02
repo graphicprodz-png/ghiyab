@@ -239,6 +239,7 @@ const DEFAULT_CFG={
   calendar:[{id:"h1",type:"holiday",name:"عيد الثورة (1 نوفمبر)",from:"2026-11-01",to:"2026-11-01"},{id:"h2",type:"holiday",name:"رأس السنة الميلادية",from:"2027-01-01",to:"2027-01-01"},{id:"h3",type:"holiday",name:"يناير — رأس السنة الأمازيغية",from:"2027-01-12",to:"2027-01-12"},{id:"h4",type:"holiday",name:"عيد العمال",from:"2027-05-01",to:"2027-05-01"}],
   pin:"",
   lastBackup:0,
+  autoBackup:false, autoBackupH:1, lastAutoBackup:0, lastDailyBackup:"", autoBackupErr:"",
   autoSms:true,
   sameOperator:true,
   simMap:{},
@@ -1034,12 +1035,25 @@ function setData(){
       <button class="btn" style="flex:0 0 auto" onclick="setPin()">${c.pin?"تغيير الرمز":"تفعيل الحماية"}</button>
       ${c.pin?`<button class="btn ghost" style="flex:0 0 auto" onclick="saveCfg({...S.cfg,pin:''});toast('أُلغيت الحماية')">إلغاء الحماية</button>`:""}
     </div></div>
-  <div class="card"><h2>النسخة الاحتياطية</h2>
-    <p class="muted" style="margin-top:0">البيانات محفوظة على هذا الجهاز فقط. خذ نسخة احتياطية كل أسبوع، وبها تنقل البيانات إلى جهاز آخر.</p>
-    <p>${days==null?`<span class="tag amb">لم تُؤخذ أي نسخة احتياطية بعد</span>`:days>7?`<span class="tag amb">آخر نسخة منذ ${days} يوماً</span>`:`<span class="tag ok">آخر نسخة: ${new Date(c.lastBackup).toLocaleDateString("ar-DZ")}</span>`}</p>
+  <div class="card"><h2>💾 النسخة الاحتياطية</h2>
+    <p class="muted" style="margin-top:0">كل البيانات (المؤسسة، الأقسام، التلاميذ، الجداول، الغيابات، الإعدادات) في ملف واحد. احفظه وأرسله لنفسك، وبه تسترجع كل شيء عند تغيير الطابليت أو الهاتف.</p>
+    <p>${days==null?`<span class="tag amb">لم تُحفظ أي نسخة بعد</span>`:days>7?`<span class="tag amb">آخر نسخة منذ ${days} يوماً</span>`:`<span class="tag ok">آخر نسخة: ${new Date(c.lastBackup).toLocaleString("ar-DZ",{dateStyle:"short",timeStyle:"short"})}</span>`}</p>
     <div class="row">
-      <button class="btn" onclick="showBackup()">أخذ نسخة احتياطية</button>
-      <label class="btn ghost">استرجاع من ملف<input type="file" accept=".json,application/json,text/plain" class="hide" onchange="restoreFile(this)"></label>
+      <button class="btn" onclick="saveBackupNow()">💾 حفظ نسخة الآن</button>
+      ${IS_APP?`<button class="btn ghost" onclick="shareBackup()">📤 إرسال النسخة (واتساب، بريد، Drive)</button>`:""}
+      <button class="btn ghost" onclick="showBackup()">نسخ كنص</button>
+    </div>
+    <p class="muted" style="margin-bottom:0">${IS_APP?"تُحفظ في مجلد التنزيلات: Download/Ghiyab":"يُنزَّل الملف في مجلد التنزيلات على هذا الجهاز."}</p></div>
+  <div class="card"><h2>⏱️ الحفظ التلقائي</h2>
+    ${IS_APP?`<label class="switch"><input type="checkbox" ${c.autoBackup?"checked":""} onchange="saveCfg({...S.cfg,autoBackup:this.checked});autoBackupTick(true)"> حفظ نسخة تلقائياً</label>
+      <div class="row" style="align-items:end"><label class="f" style="margin:0;max-width:220px">كل<select onchange="saveCfg({...S.cfg,autoBackupH:Number(this.value)})">${[[1,"ساعة"],[2,"ساعتين"],[3,"3 ساعات"],[6,"6 ساعات"],[24,"يوم"]].map(([v,t])=>`<option value="${v}" ${Number(c.autoBackupH)===v?"selected":""}>${t}</option>`).join("")}</select></label></div>
+      <p class="muted">يُحدَّث ملف واحد <b>Download/Ghiyab/ghiyab-نسخة-تلقائية.json</b> في كل مرة، وتُحفظ أيضاً نسخة يومية باسم التاريخ (للرجوع إلى يوم سابق إن لزم).</p>
+      ${c.autoBackup?`<p>${c.lastAutoBackup?`<span class="tag ok">آخر حفظ تلقائي: ${new Date(c.lastAutoBackup).toLocaleString("ar-DZ",{dateStyle:"short",timeStyle:"short"})}</span>`:`<span class="tag amb">في الانتظار</span>`} ${c.autoBackupErr?`<span class="tag red">${esc(c.autoBackupErr)}</span>`:""}</p>`:""}`
+    :`<p class="muted" style="margin:0">الحفظ التلقائي يعمل في تطبيق الطابليت (APK).</p>`}</div>
+  <div class="card"><h2>📥 استرجاع نسخة</h2>
+    <p class="muted" style="margin-top:0"><b>عند تغيير الجهاز:</b> ثبّت التطبيق على الجهاز الجديد، انقل إليه ملف النسخة (من مجلد Download/Ghiyab أو من واتساب أو البريد)، ثم اضغط «استرجاع من ملف» واختره. تُستبدل كل البيانات بمحتوى النسخة.</p>
+    <div class="row">
+      <label class="btn">📥 استرجاع من ملف<input type="file" accept=".json,application/json,text/plain,*/*" class="hide" onchange="restoreFile(this)"></label>
       <button class="btn ghost" onclick="restorePaste()">استرجاع بلصق النص</button>
     </div></div>
   <div class="card"><h2>سجل الغيابات (Excel)</h2>
@@ -1132,6 +1146,32 @@ function saveSettings(){
 }
 
 /* --- Backup / restore --- */
+const backupName=()=>`ghiyab-نسخة-${todayStr()}-${nowHM().replace(":","")}.json`;
+const toB64=blob=>new Promise(r=>{ const fr=new FileReader(); fr.onload=()=>r(String(fr.result).split(",")[1]); fr.readAsDataURL(blob); });
+async function saveBackupNow(){ const blob=new Blob([backupText()],{type:"application/json"}); S.cfg.lastBackup=Date.now(); saveLocal(); await saveBlob(blob,backupName()); render(); }
+async function shareBackup(){
+  const pl=smsPlugin(); if(!pl||!pl.shareFile) return toast("المشاركة متاحة في تطبيق الطابليت",true);
+  try{ await pl.shareFile({name:backupName(),base64:await toB64(new Blob([backupText()],{type:"application/json"})),mime:"application/json"}); S.cfg.lastBackup=Date.now(); saveLocal(); }
+  catch(e){ toast("تعذّرت المشاركة: "+((e&&e.message)||e),true); }
+}
+// الحفظ التلقائي: ملف واحد يُحدَّث + نسخة يومية
+let autoBusy=false;
+async function autoBackupTick(force){
+  if(!IS_APP||!S.cfg.autoBackup||autoBusy) return;
+  const every=(Number(S.cfg.autoBackupH)||1)*3600000;
+  if(!force&&Date.now()-(S.cfg.lastAutoBackup||0)<every) return;
+  const pl=smsPlugin(); if(!pl||!pl.saveFile) return;
+  autoBusy=true;
+  try{
+    const b64=await toB64(new Blob([backupText()],{type:"application/json"}));
+    await pl.saveFile({name:"ghiyab-نسخة-تلقائية.json",base64:b64,mime:"application/json",overwrite:true});
+    if(S.cfg.lastDailyBackup!==todayStr()){ await pl.saveFile({name:`ghiyab-يومي-${todayStr()}.json`,base64:b64,mime:"application/json",overwrite:true}); S.cfg.lastDailyBackup=todayStr(); }
+    S.cfg.lastAutoBackup=Date.now(); S.cfg.lastBackup=Date.now(); S.cfg.autoBackupErr=""; saveLocal();
+  }catch(e){ S.cfg.autoBackupErr="فشل الحفظ التلقائي: "+((e&&e.message)||e); saveLocal(); }
+  finally{ autoBusy=false; if(view==="settings") render(); }
+}
+setInterval(()=>autoBackupTick().catch(()=>{}),60000);
+setTimeout(()=>autoBackupTick().catch(()=>{}),15000);
 function backupText(){ const o={app:"ghiyab",v:2,at:new Date().toISOString(),cfg:S.cfg}; DATA_KEYS.forEach(k=>o[k]=S[k]); return JSON.stringify(o); }
 function showBackup(){
   const t=backupText();

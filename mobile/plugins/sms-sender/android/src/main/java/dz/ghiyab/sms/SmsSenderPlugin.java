@@ -15,6 +15,9 @@ import android.provider.MediaStore;
 import android.content.ContentValues;
 import android.content.ContentResolver;
 import android.net.Uri;
+import android.database.Cursor;
+import android.content.ContentUris;
+import androidx.core.content.FileProvider;
 import android.util.Base64;
 import java.io.File;
 import java.io.FileOutputStream;
@@ -154,11 +157,30 @@ public class SmsSenderPlugin extends Plugin {
         String name = call.getString("name", "ghiyab.bin");
         String b64 = call.getString("base64", "");
         String mime = call.getString("mime", "application/octet-stream");
+        boolean overwrite = Boolean.TRUE.equals(call.getBoolean("overwrite", false));
         try {
             byte[] data = Base64.decode(b64, Base64.DEFAULT);
             String path;
             if (Build.VERSION.SDK_INT >= 29) {
                 ContentResolver res = getContext().getContentResolver();
+                // استبدال نفس الملف (للنسخ التلقائي) بدل إنشاء نسخة جديدة كل مرة
+                if (overwrite) {
+                    Uri found = null;
+                    try (Cursor c = res.query(MediaStore.Downloads.EXTERNAL_CONTENT_URI, new String[]{ MediaStore.Downloads._ID },
+                            MediaStore.Downloads.DISPLAY_NAME + "=? AND " + MediaStore.Downloads.RELATIVE_PATH + "=?",
+                            new String[]{ name, Environment.DIRECTORY_DOWNLOADS + "/Ghiyab/" }, null)) {
+                        if (c != null && c.moveToFirst()) found = ContentUris.withAppendedId(MediaStore.Downloads.EXTERNAL_CONTENT_URI, c.getLong(0));
+                    } catch (Exception ignored) { }
+                    if (found != null) {
+                        try (OutputStream os = res.openOutputStream(found, "wt")) {
+                            os.write(data);
+                            JSObject r = new JSObject();
+                            r.put("path", "Download/Ghiyab/" + name);
+                            call.resolve(r);
+                            return;
+                        } catch (Exception ignored) { }
+                    }
+                }
                 ContentValues v = new ContentValues();
                 v.put(MediaStore.Downloads.DISPLAY_NAME, name);
                 v.put(MediaStore.Downloads.MIME_TYPE, mime);
@@ -178,6 +200,39 @@ public class SmsSenderPlugin extends Plugin {
             call.resolve(r);
         } catch (Exception e) {
             call.reject("تعذّر حفظ الملف: " + e.getMessage());
+        }
+    }
+
+    /** مشاركة ملف عبر واتساب أو البريد أو Google Drive... */
+    @PluginMethod
+    public void shareFile(PluginCall call) {
+        String name = call.getString("name", "ghiyab.json");
+        String b64 = call.getString("base64", "");
+        String mime = call.getString("mime", "application/octet-stream");
+        Activity act = getActivity();
+        try {
+            byte[] data = Base64.decode(b64, Base64.DEFAULT);
+            Uri uri;
+            File f = new File(getContext().getCacheDir(), name);
+            try (FileOutputStream os = new FileOutputStream(f)) { os.write(data); }
+            try {
+                uri = FileProvider.getUriForFile(getContext(), getContext().getPackageName() + ".fileprovider", f);
+            } catch (IllegalArgumentException e) {
+                File f2 = new File(getContext().getExternalFilesDir(null), name);
+                try (FileOutputStream os = new FileOutputStream(f2)) { os.write(data); }
+                uri = FileProvider.getUriForFile(getContext(), getContext().getPackageName() + ".fileprovider", f2);
+            }
+            Intent i = new Intent(Intent.ACTION_SEND);
+            i.setType(mime);
+            i.putExtra(Intent.EXTRA_STREAM, uri);
+            i.putExtra(Intent.EXTRA_SUBJECT, name);
+            i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            Intent chooser = Intent.createChooser(i, "مشاركة الملف");
+            chooser.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            act.startActivity(chooser);
+            call.resolve();
+        } catch (Exception e) {
+            call.reject("تعذّرت المشاركة: " + e.getMessage());
         }
     }
 
