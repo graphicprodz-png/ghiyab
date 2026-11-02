@@ -87,6 +87,8 @@ td.ltr{direction:ltr;text-align:end}
 .about{text-align:center;padding:24px 16px}
 .about .aicon{width:96px;height:96px;border-radius:22px;box-shadow:0 4px 14px rgba(0,0,0,.15)}
 .about h1{margin:10px 0 2px;font-size:30px;color:var(--brand)}
+.about .byline{direction:ltr;font-size:13px;font-weight:700;color:var(--brand);letter-spacing:.5px;margin:2px 0 6px}
+.by{direction:ltr;display:inline-block;font-size:11px;opacity:.85;font-weight:600;letter-spacing:.3px}
 .about h1 .latin{display:block;font-size:15px;letter-spacing:4px;color:var(--muted);font-weight:700}
 .about .ver{display:inline-block;margin-top:8px;background:var(--brand-2);color:var(--brand);font-weight:700;border-radius:99px;padding:3px 14px;direction:rtl}
 .about ul{text-align:start;max-width:440px;margin:16px auto;line-height:1.9;padding-inline-start:22px}
@@ -221,7 +223,7 @@ table.tt td.full select{font-weight:700;color:var(--brand)}
 <header>
   <h1><span id="hLogo">📋</span> <span id="schoolTitle">حضوري</span> <button id="hLock" class="hdrlock hide" onclick="showLock()" title="قفل التطبيق">🔒</button></h1>
   <div class="sub" id="hDir"></div>
-  <div class="sub"><b>حضوري – HODOURI</b> · متابعة حضور التلاميذ وإعلام الأولياء بالغياب</div>
+  <div class="sub"><b>حضوري – HODOURI</b> <span class="by">by TitteriSoft</span></div>
     <nav id="nav">
     <button data-v="session" class="on">🏠 الرئيسية</button>
     <button data-v="round">دورة الفترة</button>
@@ -1104,6 +1106,7 @@ function setAbout(){
   return `<div class="card about">
     <img src="${APP.icon}" alt="" class="aicon">
     <h1>${APP.name} <span class="latin">${APP.latin}</span></h1>
+    <div class="byline">by TitteriSoft</div>
     <div class="muted">متابعة حضور التلاميذ وإعلام الأولياء بالغياب آلياً عبر SMS</div>
     <div class="ver">الإصدار ${esc(APP.version)}</div>
     <ul>
@@ -1210,7 +1213,7 @@ function showLock(){
     <div class="dots" id="lockDots"></div><div class="lockerr" id="lockErr"></div>
     <div class="keypad">${[1,2,3,4,5,6,7,8,9].map(n=>`<button onclick="lockKey('${n}')">${n}</button>`).join("")}<button onclick="lockKey('del')">⌫</button><button onclick="lockKey('0')">0</button><button class="ok" onclick="lockKey('ok')">دخول</button></div>
     <button class="linkbtn" onclick="lockForgot()">نسيت الرمز؟</button>
-    <div class="lockfoot"><img src="${APP.icon}" alt=""> ${APP.full} ${esc(APP.version)} · TitteriSoft</div></div>`;
+    <div class="lockfoot"><img src="${APP.icon}" alt=""> <span><b>${APP.full}</b> ${esc(APP.version)}<br><span class="by">by TitteriSoft</span></span></div></div>`;
   lockDots();
 }
 function lockDots(){ const d=document.getElementById("lockDots"); if(d) d.innerHTML=Array.from({length:Math.max(4,lockBuf.length)},(_,i)=>`<i class="${i<lockBuf.length?"on":""}"></i>`).join(""); }
