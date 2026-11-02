@@ -237,6 +237,16 @@ public class SmsSenderPlugin extends Plugin {
     }
 
     @PluginMethod
+    public void getDeviceId(PluginCall call) {
+        String id = null;
+        try { id = android.provider.Settings.Secure.getString(getContext().getContentResolver(), android.provider.Settings.Secure.ANDROID_ID); } catch (Exception e) { }
+        JSObject r = new JSObject();
+        r.put("id", id == null ? "" : id);
+        r.put("model", Build.MANUFACTURER + " " + Build.MODEL);
+        call.resolve(r);
+    }
+
+    @PluginMethod
     public void keepAwake(PluginCall call) {
         Activity act = getActivity();
         if (act != null) {

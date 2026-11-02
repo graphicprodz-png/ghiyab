@@ -85,6 +85,10 @@ td.ltr{direction:ltr;text-align:end}
 .dialog{background:#fff;border-radius:16px;padding:16px;max-width:420px;width:100%}
 .hide{display:none!important}
 .about{text-align:center;padding:24px 16px}
+.licbox{max-width:440px;margin:10px auto 0;text-align:center}
+.devcode{font:700 26px/1.3 ui-monospace,Menlo,Consolas,monospace;letter-spacing:2px;color:var(--brand);background:var(--brand-2);border:1px dashed var(--brand);border-radius:12px;padding:10px;margin:6px 0 10px}
+.licbox textarea{width:100%;font-family:ui-monospace,monospace;font-size:13px}
+.licban{background:var(--amber-2);color:var(--amber);border:1px solid #f0d9ae;border-radius:12px;padding:10px 14px;margin-bottom:12px;cursor:pointer;font-size:14px}
 .about .aicon{width:96px;height:96px;border-radius:22px;box-shadow:0 4px 14px rgba(0,0,0,.15)}
 .about h1{margin:10px 0 2px;font-size:30px;color:var(--brand)}
 .about .byline{direction:ltr;font-size:13px;font-weight:700;color:var(--brand);letter-spacing:.5px;margin:2px 0 6px}
@@ -450,10 +454,11 @@ function render(){
   updateBadge();
   document.body.classList.toggle("rep",["report","reports","letter"].includes(view));
   const m=document.getElementById("main");
+  if(licBlocked()){ m.innerHTML=flashHTML()+vLicWall(); return; }
   const active=document.activeElement&&document.activeElement.id;
   setTimeout(()=>{ if(view==="settings"&&setTab==="msg") smsCount(); },0);
   if(S.cfg.pin&&(PROTECTED.includes(view)||(view==="att"&&session&&session.date<todayStr()))&&Date.now()>unlockUntil){ m.innerHTML=pinScreen(); setTimeout(()=>{const x=document.getElementById("pinIn"); x&&x.focus()},30); return; }
-  m.innerHTML=({reports:vReports,letter:vLetter,session:vHome,round:vRound,week:vWeek,day:vDay,att:vAtt,sessions:vSessions,report:vReport,notifs:vNotifs,students:vStudents,timetable:vTimetable,staff:vStaff,labels:vLabels,settings:vSettings}[view]||vSession)();
+  m.innerHTML=(view==="session"?licBanner():"")+({reports:vReports,letter:vLetter,session:vHome,round:vRound,week:vWeek,day:vDay,att:vAtt,sessions:vSessions,report:vReport,notifs:vNotifs,students:vStudents,timetable:vTimetable,staff:vStaff,labels:vLabels,settings:vSettings}[view]||vSession)();
   if(["reports","letter"].includes(view)) setTimeout(fitSheets,0);
   if(active==="scanInput"){ const s=document.getElementById("scanInput"); if(s) s.focus(); }
 }
@@ -837,7 +842,7 @@ function sendNow(id){ const a=S.absences.find(x=>x.id===id); if(a) put("absences
 /* --- Automatic SMS from the device SIM --- */
 let sending=false;
 async function autoSendTick(){
-  if(sending||!autoOn()) return;
+  if(sending||!autoOn()||licBlocked()) return;
   const w=S.cfg.sendWindow||{}, hm=nowHM();
   if((w.from&&hm<w.from)||(w.to&&hm>w.to)) return; // خارج ساعات الإرسال المسموحة
   const due=S.absences.filter(a=>a.status==="waiting"&&a.notifyAt<=Date.now()&&(a.attempts||0)<3);
@@ -975,7 +980,7 @@ const SET_TABS=[["school","🏫 المؤسسة"],["time","📅 السنة وال
 function vSettings(){
   return `<div class="appfoot noprint" onclick="setTab='about';render()"><img src="${APP.icon}" alt=""> ${APP.full} — الإصدار ${esc(APP.version)} · تصميم وتطوير TitteriSoft</div><div class="card noprint" style="padding:8px"><div class="segs">${SET_TABS.map(([k,t])=>`<button class="${k===setTab?"on":""}" onclick="setTab='${k}';flashMsg=null;render()">${t}</button>`).join("")}</div></div>
   ${flashHTML()}
-  ${({about:setAbout,school:setSchool,time:periodsCard,cal:setCal,msg:setMsg,sms:setSms,data:setData,help:setHelp}[setTab]||setSchool)()}`;
+  ${({about:()=>setAbout()+licCard(),school:setSchool,time:periodsCard,cal:setCal,msg:setMsg,sms:setSms,data:setData,help:setHelp}[setTab]||setSchool)()}`;
 }
 const WILAYAS=["أدرار","الشلف","الأغواط","أم البواقي","باتنة","بجاية","بسكرة","بشار","البليدة","البويرة","تمنراست","تبسة","تلمسان","تيارت","تيزي وزو","الجزائر","الجلفة","جيجل","سطيف","سعيدة","سكيكدة","سيدي بلعباس","عنابة","قالمة","قسنطينة","المدية","مستغانم","المسيلة","معسكر","ورقلة","وهران","البيض","إليزي","برج بوعريريج","بومرداس","الطارف","تندوف","تيسمسيلت","الوادي","خنشلة","سوق أهراس","تيبازة","ميلة","عين الدفلى","النعامة","عين تموشنت","غرداية","غليزان","تيميمون","برج باجي مختار","أولاد جلال","بني عباس","عين صالح","عين قزام","تقرت","جانت","المغير","المنيعة"];
 const LEVELS={"ابتدائية":["التحضيري","1 ابتدائي","2 ابتدائي","3 ابتدائي","4 ابتدائي","5 ابتدائي"],"متوسطة":["1 متوسط","2 متوسط","3 متوسط","4 متوسط"],"ثانوية":["1 ثانوي","2 ثانوي","3 ثانوي"]};
@@ -2089,10 +2094,124 @@ async function seedDemo(){
   selClass=firstId; lsSet("ghiyab_selClass",firstId); toast("أُضيفت 4 أقسام تجريبية بتلاميذها وأساتذتها وجداول توقيتها");
 }
 
+/* ============ الترخيص — مفاتيح مركز التراخيص (HD1 · ECDSA P-256) ============ */
+// المفتاح العام لحضوري: يُنسخ من مركز التراخيص (الإعدادات ← المفاتيح العامة). فارغ = الترخيص غير مفعّل.
+const LIC_PUB={x:"",y:""};
+const LIC_ON=!!(LIC_PUB.x&&LIC_PUB.y);
+const TRIAL_DAYS=30;
+let LIC={st:LIC_ON?"check":"off"}, DEVCODE="";
+const licGet=k=>{try{return localStorage.getItem(k)}catch(e){return null}};
+const licSet=(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}};
+const b64uD=s=>{s=s.replace(/-/g,"+").replace(/_/g,"/");while(s.length%4)s+="=";return Uint8Array.from(atob(s),c=>c.charCodeAt(0))};
+const b64uE=u=>btoa(String.fromCharCode(...u)).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");
+const hexB=h=>Uint8Array.from(h.match(/../g),x=>parseInt(x,16));
+const ymdN=d=>d.getFullYear()*10000+(d.getMonth()+1)*100+d.getDate();
+const ymdD=n=>new Date(Math.floor(n/10000),Math.floor(n/100)%100-1,n%100);
+const ymdTxt=n=>n?String(n).replace(/(\d{4})(\d\d)(\d\d)/,"$3/$2/$1"):"مدى الحياة";
+const dBetween=(a,b)=>Math.round((ymdD(b)-ymdD(a))/864e5);
+// تاريخ اليوم مع حماية من إرجاع ساعة الجهاز إلى الوراء
+function licToday(){ const t=ymdN(new Date()), seen=+licGet("hodouri_seen")||0; if(t>seen) licSet("hodouri_seen",String(t)); return Math.max(t,seen); }
+async function devCode(){
+  if(DEVCODE) return DEVCODE;
+  let seed=""; const p=smsPlugin();
+  if(p&&p.getDeviceId){ try{ const r=await p.getDeviceId(); seed=(r&&r.id)||""; }catch(e){} }
+  if(!seed){ seed=licGet("hodouri_seed"); if(!seed){ seed=b64uE(crypto.getRandomValues(new Uint8Array(12))); licSet("hodouri_seed",seed); } }
+  const h=new Uint8Array(await crypto.subtle.digest("SHA-256",new TextEncoder().encode("HODOURI|"+seed)));
+  const A="ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; let c="";
+  for(let i=0;i<12;i++){ c+=A[h[i]%32]; if(i===3||i===7) c+="-"; }
+  return DEVCODE=c;
+}
+async function licVerify(raw){
+  const m=String(raw||"").replace(/\s+/g,"").match(/HD1\.([A-Za-z0-9_-]+)\.([A-Za-z0-9_-]+)/);
+  if(!m) return {ok:false,why:"لم يُعثر على مفتاح حضوري (يبدأ بـ HD1.)"};
+  let pay,sig; try{ pay=b64uD(m[1]); sig=b64uD(m[2]); }catch(e){ return {ok:false,why:"المفتاح ناقص أو مشوّه"}; }
+  let good=false;
+  try{
+    const k=await crypto.subtle.importKey("jwk",{kty:"EC",crv:"P-256",x:b64uE(hexB(LIC_PUB.x)),y:b64uE(hexB(LIC_PUB.y)),ext:true},{name:"ECDSA",namedCurve:"P-256"},false,["verify"]);
+    good=await crypto.subtle.verify({name:"ECDSA",hash:"SHA-256"},k,sig,pay);
+  }catch(e){ good=false; }
+  if(!good) return {ok:false,why:"المفتاح غير صالح"};
+  const [dev,exp]=new TextDecoder().decode(pay).split("|"), e=+exp||0;
+  if(dev!==await devCode()) return {ok:false,why:"هذا المفتاح صادر لجهاز آخر ("+dev+")"};
+  if(e&&e<licToday()) return {ok:false,expired:true,exp:e,why:"انتهت صلاحية هذا المفتاح في "+ymdTxt(e)};
+  return {ok:true,exp:e,key:m[0]};
+}
+async function licCheck(){
+  if(!LIC_ON){ LIC={st:"off"}; return; }
+  await devCode(); const today=licToday(), key=licGet("hodouri_lic");
+  if(key){
+    const r=await licVerify(key);
+    if(r.ok){ LIC={st:"ok",exp:r.exp,left:r.exp?dBetween(today,r.exp):null}; return; }
+    if(r.expired){ LIC={st:"expired",exp:r.exp}; return; }
+  }
+  // الفترة التجريبية: تبدأ عند أول تشغيل وتُحفظ أيضاً في الإعدادات (فتنتقل مع النسخة الاحتياطية)
+  let t0=+licGet("hodouri_t0")||0; const c0=+(S.cfg.lt0||0);
+  if(c0&&(!t0||c0<t0)) t0=c0; if(!t0) t0=today;
+  licSet("hodouri_t0",String(t0)); if(S.cfg.lt0!==t0){ S.cfg.lt0=t0; saveLocal(); }
+  const left=TRIAL_DAYS-dBetween(t0,today);
+  LIC=left>0?{st:"trial",left}:{st:"trialEnd"};
+}
+const licBlocked=()=>LIC.st==="expired"||LIC.st==="trialEnd";
+function licStatusTag(){
+  return ({ok:LIC.exp?`<span class="tag ok">مرخّص حتى ${ymdTxt(LIC.exp)}</span>`:`<span class="tag ok">ترخيص مدى الحياة</span>`,
+    trial:`<span class="tag amb">نسخة تجريبية — باقي ${LIC.left} يوماً</span>`,
+    trialEnd:`<span class="tag red">انتهت الفترة التجريبية</span>`,
+    expired:`<span class="tag red">انتهى الترخيص في ${ymdTxt(LIC.exp)}</span>`,
+    check:`<span class="tag">جارٍ التحقق…</span>`})[LIC.st]||"";
+}
+function licWaLink(){
+  const msg="السلام عليكم، أطلب مفتاح ترخيص تطبيق حضوري – HODOURI.\nالمؤسسة: "+(S.cfg.school||"")+(S.cfg.commune?" — "+S.cfg.commune:"")+"\nرمز الجهاز: "+DEVCODE;
+  return "https://wa.me/213"+APP.wa.replace(/^0/,"")+"?text="+encodeURIComponent(msg);
+}
+function licBox(){
+  const tgt=IS_APP?"":'target="_blank" rel="noopener"';
+  return `<div class="licbox">
+    <div class="muted">رمز هذا الجهاز</div>
+    <div class="devcode" dir="ltr">${esc(DEVCODE||"…")}</div>
+    <div class="row" style="justify-content:center;gap:8px">
+      <button class="btn ghost" style="flex:0 0 auto" onclick="licCopy()">📋 نسخ الرمز</button>
+      <a class="btn wabtn" style="flex:0 0 auto" href="${licWaLink()}" ${tgt}><img src="${WA_LOGO}" alt="" class="walogo"><span class="watxt"><small>اطلب المفتاح</small><b>عبر واتساب</b></span></a>
+    </div>
+    <label class="f" style="margin-top:12px">مفتاح التفعيل (الصق المفتاح أو الرسالة كاملة)
+      <textarea id="licIn" rows="3" dir="ltr" placeholder="HD1.xxxxxxxx.xxxxxxxx"></textarea></label>
+    <button class="btn" onclick="licActivate()">🔑 تفعيل</button>
+  </div>`;
+}
+function licCard(){
+  if(!LIC_ON) return "";
+  return `<div class="card"><h2>🔑 الترخيص</h2><p>${licStatusTag()}</p>
+    ${LIC.st==="ok"?`<details><summary class="muted">رمز الجهاز وتغيير المفتاح</summary>${licBox()}</details>`:licBox()}</div>`;
+}
+function vLicWall(){
+  return `<div class="card about">
+    <img src="${APP.icon}" alt="" class="aicon">
+    <h1>${APP.name} <span class="latin">${APP.latin}</span></h1>
+    <p>${licStatusTag()}</p>
+    <p class="muted">لمواصلة استعمال التطبيق أرسل رمز الجهاز إلى TitteriSoft واحصل على مفتاح التفعيل.<br>بياناتك محفوظة كما هي ولن تضيع.</p>
+    ${licBox()}
+    <div class="row" style="justify-content:center;margin-top:14px"><button class="btn ghost" style="flex:0 0 auto" onclick="saveBackupNow()">💾 حفظ نسخة احتياطية من البيانات</button></div>
+  </div>`;
+}
+function licBanner(){
+  if(LIC.st==="trial") return `<div class="licban" onclick="view='settings';setTab='about';render()">🔑 نسخة تجريبية — باقي <b>${LIC.left}</b> يوماً. اضغط هنا للتفعيل.</div>`;
+  if(LIC.st==="ok"&&LIC.exp&&LIC.left<=15) return `<div class="licban" onclick="view='settings';setTab='about';render()">⏳ ينتهي الترخيص بعد <b>${LIC.left}</b> يوماً (${ymdTxt(LIC.exp)}). اضغط هنا للتجديد.</div>`;
+  return "";
+}
+async function licCopy(){ try{ await navigator.clipboard.writeText(DEVCODE); toast("نُسخ رمز الجهاز"); }catch(e){ toast("رمز الجهاز: "+DEVCODE); } }
+async function licActivate(){
+  const v=(document.getElementById("licIn")||{}).value||"";
+  const r=await licVerify(v);
+  if(!r.ok) return toast(r.why,true);
+  licSet("hodouri_lic",r.key); await licCheck();
+  toast(r.exp?"✓ تم التفعيل — صالح حتى "+ymdTxt(r.exp):"✓ تم التفعيل — ترخيص مدى الحياة");
+}
+
 /* ============ Boot ============ */
 setTimeout(()=>{ if(S.cfg.appPin) showLock(); },0);
 window.addEventListener("resize",()=>{ if(["report","reports","letter"].includes(view)&&!zoom) render(); });
 render();
+licCheck().then(render).catch(()=>{});
+setInterval(()=>{ licCheck().then(()=>{ if(licBlocked()) render(); }).catch(()=>{}); },3600000);
 if(IS_APP){ try{ const p=smsPlugin(); p&&p.keepAwake&&p.keepAwake(); }catch(e){} }
 let lastAct=-1;
 setInterval(()=>{
