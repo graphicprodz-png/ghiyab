@@ -37,6 +37,7 @@ jobs:
       - name: إنشاء مشروع أندرويد
         run: |
           cp node_modules/@capacitor/core/dist/capacitor.js www/capacitor.js || true
+          sed -i "s/__APP_VERSION__/1.${{ github.run_number }}/g" www/index.html
           cp node_modules/xlsx/dist/xlsx.full.min.js www/xlsx.full.min.js || true
           npx cap add android
 
@@ -46,6 +47,12 @@ jobs:
 
       - name: مزامنة
         run: npx cap sync android
+
+      - name: رقم الإصدار
+        working-directory: mobile/android
+        run: |
+          sed -i "s/versionCode [0-9]*/versionCode ${{ github.run_number }}/; s/versionName \"[^\"]*\"/versionName \"1.${{ github.run_number }}\"/" app/build.gradle
+          grep -E "versionCode|versionName" app/build.gradle
 
       - name: بناء APK
         working-directory: mobile/android
