@@ -11,6 +11,10 @@ import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
 import android.telephony.SmsManager;
+import android.telephony.SubscriptionInfo;
+import android.telephony.SubscriptionManager;
+
+import com.getcapacitor.JSArray;
 import android.view.WindowManager;
 
 import com.getcapacitor.JSObject;
@@ -23,6 +27,7 @@ import com.getcapacitor.annotation.Permission;
 import com.getcapacitor.annotation.PermissionCallback;
 
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Random;
 import java.util.UUID;
 
@@ -32,7 +37,10 @@ import java.util.UUID;
  */
 @CapacitorPlugin(
     name = "SmsSender",
-    permissions = { @Permission(alias = "sms", strings = { Manifest.permission.SEND_SMS }) }
+    permissions = {
+        @Permission(alias = "sms", strings = { Manifest.permission.SEND_SMS }),
+        @Permission(alias = "phone", strings = { Manifest.permission.READ_PHONE_STATE })
+    }
 )
 public class SmsSenderPlugin extends Plugin {
 
@@ -58,6 +66,53 @@ public class SmsSenderPlugin extends Plugin {
         }
     }
 
+    /** قائمة الشرائح الموجودة في الجهاز (موبيليس، جيزي، أوريدو...) */
+    @PluginMethod
+    public void getSims(PluginCall call) {
+        if (getPermissionState("phone") != PermissionState.GRANTED) {
+            requestPermissionForAlias("phone", call, "phonePermCallback");
+            return;
+        }
+        doGetSims(call);
+    }
+
+    @PermissionCallback
+    private void phonePermCallback(PluginCall call) {
+        if (getPermissionState("phone") == PermissionState.GRANTED) doGetSims(call);
+        else call.reject("لم يُسمح للتطبيق بمعرفة الشرائح. فعّل إذن «الهاتف» من إعدادات التطبيق في أندرويد.");
+    }
+
+    private void doGetSims(PluginCall call) {
+        JSArray arr = new JSArray();
+        int def = -1;
+        try {
+            SubscriptionManager sm = (SubscriptionManager) getContext().getSystemService(Context.TELEPHONY_SUBSCRIPTION_SERVICE);
+            if (Build.VERSION.SDK_INT >= 24) def = SubscriptionManager.getDefaultSmsSubscriptionId();
+            List<SubscriptionInfo> list = sm != null ? sm.getActiveSubscriptionInfoList() : null;
+            if (list != null) {
+                for (SubscriptionInfo si : list) {
+                    JSObject o = new JSObject();
+                    o.put("id", si.getSubscriptionId());
+                    o.put("slot", si.getSimSlotIndex());
+                    o.put("carrier", si.getCarrierName() != null ? si.getCarrierName().toString() : "");
+                    o.put("name", si.getDisplayName() != null ? si.getDisplayName().toString() : "");
+                    o.put("isDefault", si.getSubscriptionId() == def);
+                    arr.put(o);
+                }
+            }
+        } catch (SecurityException e) {
+            call.reject("لا يوجد إذن لقراءة الشرائح");
+            return;
+        } catch (Exception e) {
+            call.reject("تعذّرت قراءة الشرائح: " + e.getMessage());
+            return;
+        }
+        JSObject r = new JSObject();
+        r.put("sims", arr);
+        r.put("defaultSms", def);
+        call.resolve(r);
+    }
+
     @PluginMethod
     public void keepAwake(PluginCall call) {
         Activity act = getActivity();
@@ -76,9 +131,17 @@ public class SmsSenderPlugin extends Plugin {
         }
 
         final Context ctx = getContext();
+        // الشريحة المختارة (موبيليس/جيزي/أوريدو) أو الشريحة الافتراضية للرسائل
+        Integer subId = call.getInt("subscriptionId");
         SmsManager sms;
         try {
-            sms = Build.VERSION.SDK_INT >= 31 ? ctx.getSystemService(SmsManager.class) : SmsManager.getDefault();
+            if (subId != null && subId >= 0) {
+                sms = Build.VERSION.SDK_INT >= 31
+                    ? ctx.getSystemService(SmsManager.class).createForSubscriptionId(subId)
+                    : SmsManager.getSmsManagerForSubscriptionId(subId);
+            } else {
+                sms = Build.VERSION.SDK_INT >= 31 ? ctx.getSystemService(SmsManager.class) : SmsManager.getDefault();
+            }
         } catch (Exception e) {
             sms = null;
         }

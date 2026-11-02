@@ -111,6 +111,10 @@ td.ltr{direction:ltr;text-align:end}
 const DEFAULT_CFG={
   school:"ثانوية النموذجية",
   autoSms:true,
+  sameOperator:true,
+  simMap:{},
+  simDefault:null,
+  simsCache:[],
   delayMin:15,
   cc:"213",
   template:"{المؤسسة}: ابنكم {الاسم} ({القسم}) غائب عن حصة {المادة} يوم {التاريخ} من {من} إلى {إلى}."
@@ -163,6 +167,34 @@ const addHM=(hm,min)=>{const[h,m]=hm.split(":").map(Number);const t=h*60+m+min;r
 const fmtDate=s=>{try{const[y,m,d]=s.split("-");return d+"/"+m+"/"+y}catch(e){return s}};
 const cls=id=>S.classes.find(c=>c.id===id);
 const stuByCode=code=>S.students.find(s=>s.code===String(code).trim());
+/* ============ المتعاملون: موبيليس، جيزي، أوريدو ============ */
+const OPS={mobilis:{name:"موبيليس",color:"#1f9d55",re:/mobilis|algerie\s*telecom|\bATM\b/i},djezzy:{name:"جيزي",color:"#c0392b",re:/djezzy|optimum/i},ooredoo:{name:"أوريدو",color:"#b7791f",re:/ooredoo|nedjma|wataniya/i}};
+function operatorOf(p){
+  let d=String(p||"").replace(/[^\d+]/g,"");
+  if(d.startsWith("+213")) d="0"+d.slice(4); else if(d.startsWith("00213")) d="0"+d.slice(5); else if(d.startsWith("213")&&d.length===12) d="0"+d.slice(3);
+  if(d.length!==10) return null;
+  return {"06":"mobilis","07":"djezzy","05":"ooredoo"}[d.slice(0,2)]||null;
+}
+const opTag=(op)=>op?`<span class="tag" style="background:${OPS[op].color}1a;color:${OPS[op].color}">${OPS[op].name}</span>`:"";
+function simLabel(id){ const x=(S.cfg.simsCache||[]).find(z=>String(z.id)===String(id)); return x?`شريحة ${x.slot+1} (${x.carrier||x.name})`:"الشريحة الافتراضية"; }
+// الشريحة التي تُرسل منها رسالة هذا الولي
+function pickSim(phone){
+  const op=operatorOf(phone), m=S.cfg.simMap||{};
+  if(S.cfg.sameOperator&&op&&m[op]!=null&&m[op]!=="") return Number(m[op]);
+  return S.cfg.simDefault!=null&&S.cfg.simDefault!==""?Number(S.cfg.simDefault):undefined;
+}
+async function detectSims(){
+  const pl=smsPlugin(); if(!pl||!pl.getSims) return toast("اكتشاف الشرائح يعمل في تطبيق الطابليت فقط",true);
+  try{
+    const r=await pl.getSims(); const sims=(r.sims||[]).sort((a,b)=>a.slot-b.slot);
+    const map={...(S.cfg.simMap||{})};
+    sims.forEach(x=>{ Object.keys(OPS).forEach(op=>{ if(OPS[op].re.test(x.carrier+" "+x.name)&&(map[op]==null||map[op]==="")) map[op]=x.id; }); });
+    await saveCfg({...S.cfg,simsCache:sims,simMap:map});
+    toast(sims.length?`وُجدت ${sims.length} شريحة`:"لم تُكتشف أي شريحة",!sims.length);
+  }catch(e){ toast("تعذّر اكتشاف الشرائح: "+((e&&e.message)||e),true); }
+}
+function setSim(op,val){ const m={...(S.cfg.simMap||{})}; m[op]=val===""?null:Number(val); saveCfg({...S.cfg,simMap:m}); }
+
 function intlPhone(p){
   let d=String(p||"").replace(/[^\d+]/g,"");
   if(d.startsWith("+")) return d.slice(1);
@@ -358,7 +390,7 @@ function vNotifs(){
       :`<span class="muted">أضف رقم الولي في «الأقسام والتلاميذ».</span>`;
     return `<div class="notif">
       <div class="top"><div><b>${esc(a.studentName)}</b> <span class="muted">· ${esc(a.subject)} · ${a.from}–${a.to}</span><br>
-        <span class="muted">الولي: ${esc(st.parent||"—")} · <span style="direction:ltr;display:inline-block">${esc(st.phone||"لا يوجد رقم")}</span></span></div>${tag}</div>
+        <span class="muted">الولي: ${esc(st.parent||"—")} · <span style="direction:ltr;display:inline-block">${esc(st.phone||"لا يوجد رقم")}</span> ${opTag(operatorOf(st.phone))}</span></div>${tag}</div>
       ${kind!=="sent"?`<div class="msg">${esc(msg)}</div>`:""}
       ${a.status==="failed"&&a.lastError?`<div class="flash err" style="font-size:12.5px">${esc(a.lastError)}</div>`:""}
       <div class="act">
@@ -366,7 +398,7 @@ function vNotifs(){
         ${kind==="act"&&a.status==="failed"&&auto&&phone?`<button class="btn ghost sm" onclick="sendNow('${a.id}')">إعادة المحاولة</button>`:""}
         ${kind==="wait"&&a.status==="waiting"?`<button class="btn ghost sm" onclick="sendNow('${a.id}')">${auto?"أرسل الآن":"جاهز الآن"}</button>`:""}
         ${kind!=="sent"&&a.status!=="sending"?`<button class="btn ghost sm" onclick="markSent('${a.id}','manual')">أُعلم الولي بطريقة أخرى</button>`:""}
-        ${kind==="sent"?`<span class="muted">عبر ${({sms:"SMS",whatsapp:"واتساب",manual:"وسيلة أخرى"})[a.channel]||""} · ${a.sentAt?new Date(a.sentAt).toLocaleTimeString("ar-DZ",{hour:"2-digit",minute:"2-digit"}):""}</span>`:""}
+        ${kind==="sent"?`<span class="muted">عبر ${({sms:"SMS",whatsapp:"واتساب",manual:"وسيلة أخرى"})[a.channel]||""}${a.via?" — "+esc(a.via):""} · ${a.sentAt?new Date(a.sentAt).toLocaleTimeString("ar-DZ",{hour:"2-digit",minute:"2-digit"}):""}</span>`:""}
       </div></div>`;
   };
   return `<div class="card noprint"><div class="row" style="align-items:end">
@@ -404,8 +436,9 @@ async function autoSendTick(){
       const phone=intlPhone(st.phone);
       if(!phone){ await put("absences",{...a,status:"failed",lastError:"لا يوجد رقم هاتف للولي"}); continue; }
       try{
-        await smsPlugin().send({phone:"+"+phone,message:message(a)});
-        await put("absences",{...a,status:"sent",channel:"sms",sentAt:Date.now(),attempts:(a.attempts||0)+1,lastError:""});
+        const sim=pickSim(st.phone);
+        await smsPlugin().send({phone:"+"+phone,message:message(a),...(sim!=null?{subscriptionId:sim}:{})});
+        await put("absences",{...a,status:"sent",channel:"sms",via:simLabel(sim),sentAt:Date.now(),attempts:(a.attempts||0)+1,lastError:""});
       }catch(e){
         const n=(a.attempts||0)+1;
         await put("absences",{...a,attempts:n,status:n>=3?"failed":"waiting",lastError:String((e&&e.message)||e).slice(0,300),notifyAt:Date.now()+120000});
@@ -445,7 +478,7 @@ function vStudents(){
       <button class="btn ghost" onclick="bulkAdd()">إضافة القائمة</button>
     </details>
     ${list.length?`<table style="margin-top:10px"><tr><th>الرقم</th><th>الاسم</th><th>الولي</th><th>الهاتف</th><th></th></tr>
-      ${list.map(s=>`<tr><td class="ltr" style="text-align:start">${esc(s.code)}</td><td>${esc(s.name)}</td><td>${esc(s.parent||"")}</td><td class="ltr">${esc(s.phone||"")}</td>
+      ${list.map(s=>`<tr><td class="ltr" style="text-align:start">${esc(s.code)}</td><td>${esc(s.name)}</td><td>${esc(s.parent||"")}</td><td class="ltr">${esc(s.phone||"")} ${opTag(operatorOf(s.phone))}</td>
       <td style="white-space:nowrap"><button class="btn ghost sm" onclick="editStudent('${s.id}')">تعديل</button></td></tr>`).join("")}</table>`:`<div class="empty">أضف تلاميذ هذا القسم. يتولد رقم وكودبار كل تلميذ تلقائياً.</div>`}
   </div>`:(S.classes.length?`<div class="card empty">اختر قسماً لعرض تلاميذه.</div>`:"")}`;
 }
@@ -533,9 +566,11 @@ function vSettings(){
     ${IS_APP?`<label class="switch"><input type="checkbox" ${S.cfg.autoSms?"checked":""} onchange="saveCfg({...S.cfg,autoSms:this.checked})"> إرسال SMS آلياً من شريحة هذا الجهاز عند حلول الموعد</label>
       <p class="muted" style="margin-top:0">تُرسل الرسائل من رصيد الشريحة. اترك التطبيق مفتوحاً أثناء الدوام (الشاشة لا تنطفئ ما دام مفتوحاً). أي رسالة تأخرت تُرسل فور فتح التطبيق.</p>
       <div class="row" style="align-items:end"><label class="f" style="margin:0">رقم لتجربة الإرسال<input id="testPhone" inputmode="tel" placeholder="0550 12 34 56" style="direction:ltr"></label>
-      <button class="btn ghost" style="flex:0 0 auto" onclick="testSms()">إرسال رسالة تجريبية</button></div>`
+      <button class="btn ghost" style="flex:0 0 auto" onclick="testSms()">إرسال رسالة تجريبية</button></div>
+      <p class="muted" style="margin:4px 0 0">تُرسل الرسالة التجريبية من الشريحة المناسبة لمتعامل الرقم المكتوب.</p>`
     :`<p class="muted" style="margin:0">الإرسال الآلي يعمل فقط في تطبيق الطابليت (APK) لأنه يستعمل شريحة الجهاز.</p>`}
   </div>
+  ${simsCard()}
   <div class="card"><h2>نسخة احتياطية</h2>
     <p class="muted" style="margin-top:0">البيانات محفوظة على هذا الجهاز فقط. خذ نسخة احتياطية كل أسبوع، وبها تنقل البيانات إلى جهاز آخر.</p>
     <div class="row">
@@ -548,13 +583,35 @@ function vSettings(){
       <li>الإدارة تُدخل الأقسام والتلاميذ وأرقام الأولياء، فيتولد لكل تلميذ رقم وكودبار.</li>
       <li>تُطبع الملصقات وتُلصق في الدفتر اليومي لكل تلميذ.</li>
       <li>المشرف يبدأ الحصة (القسم، المادة، الأستاذ، التوقيت) ويسجّل الغائبين بالضغط على أسمائهم أو بمسح الكودبار.</li>
-      <li>بعد المهلة المحددة يرسل التطبيق SMS آلياً لولي كل تلميذ غائب من شريحة الطابليت، ويمكن أيضاً الإرسال يدوياً عبر واتساب.</li>
+      <li>بعد المهلة المحددة يرسل التطبيق SMS آلياً لولي كل تلميذ غائب من شريحة الطابليت (موبيليس أو جيزي أو أوريدو، حسب متعامل الولي إن وُجدت عدة شرائح)، ويمكن أيضاً الإرسال يدوياً عبر واتساب.</li>
     </ol></div>`;
 }
+function simsCard(){
+  const sims=S.cfg.simsCache||[], m=S.cfg.simMap||{};
+  const counts={mobilis:0,djezzy:0,ooredoo:0,other:0};
+  S.students.forEach(s=>{ if(!s.phone) return; const op=operatorOf(s.phone); counts[op||"other"]++; });
+  const opt=(sel)=>`<option value="" ${sel==null||sel===""?"selected":""}>الشريحة الافتراضية</option>`+sims.map(x=>`<option value="${x.id}" ${String(sel)===String(x.id)?"selected":""}>شريحة ${x.slot+1} — ${esc(x.carrier||x.name)}</option>`).join("");
+  return `<div class="card"><h2>المتعاملون والشرائح</h2>
+    <p class="muted" style="margin-top:0">يتعرّف التطبيق على متعامل كل ولي من رقمه: <b>06</b> موبيليس، <b>07</b> جيزي، <b>05</b> أوريدو. إذا كان في الطابليت أكثر من شريحة، تُرسل رسالة كل ولي من شريحة نفس متعامله (عادةً أرخص).</p>
+    <div class="stats" style="grid-template-columns:repeat(4,1fr)">
+      ${Object.keys(OPS).map(op=>`<div class="stat"><b style="color:${OPS[op].color}">${counts[op]}</b><span>ولي ${OPS[op].name}</span></div>`).join("")}
+      <div class="stat"><b>${counts.other}</b><span>أرقام أخرى</span></div>
+    </div>
+    ${IS_APP?`<div class="row" style="align-items:center;margin-bottom:10px"><button class="btn ghost" style="flex:0 0 auto" onclick="detectSims()">🔍 اكتشاف الشرائح</button>
+        <span class="muted">${sims.length?sims.map(x=>`شريحة ${x.slot+1}: ${esc(x.carrier||x.name)}${x.isDefault?" (افتراضية)":""}`).join(" · "):"لم تُكتشف الشرائح بعد"}</span></div>
+      <label class="switch"><input type="checkbox" ${S.cfg.sameOperator?"checked":""} onchange="saveCfg({...S.cfg,sameOperator:this.checked})"> أرسل لكل ولي من شريحة نفس متعامله</label>
+      <div class="row">
+        ${Object.keys(OPS).map(op=>`<label class="f">أولياء ${OPS[op].name} ← من<select onchange="setSim('${op}',this.value)">${opt(m[op])}</select></label>`).join("")}
+        <label class="f">بقية الأرقام ← من<select onchange="saveCfg({...S.cfg,simDefault:this.value===''?null:Number(this.value)})">${opt(S.cfg.simDefault)}</select></label>
+      </div>`
+    :`<p class="muted" style="margin:0">اختيار الشريحة يتم في تطبيق الطابليت.</p>`}
+  </div>`;
+}
 async function testSms(){
-  const ph=intlPhone(document.getElementById("testPhone").value);
+  const raw=document.getElementById("testPhone").value, ph=intlPhone(raw);
   if(!ph) return toast("أدخل رقماً",true);
-  try{ await smsPlugin().send({phone:"+"+ph,message:"رسالة تجريبية من تطبيق غياب — "+(S.cfg.school||"")}); toast("أُرسلت الرسالة التجريبية ✓"); }
+  const sim=pickSim(raw);
+  try{ await smsPlugin().send({phone:"+"+ph,message:"رسالة تجريبية من تطبيق غياب — "+(S.cfg.school||""),...(sim!=null?{subscriptionId:sim}:{})}); toast("أُرسلت الرسالة التجريبية ✓ ("+simLabel(sim)+")"); }
   catch(e){ toast("فشل الإرسال: "+((e&&e.message)||e),true); }
 }
 function smsCount(){
