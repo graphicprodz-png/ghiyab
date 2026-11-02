@@ -40,6 +40,11 @@ import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
+import com.getcapacitor.annotation.ActivityCallback;
+import androidx.activity.result.ActivityResult;
+import android.app.role.RoleManager;
+import android.content.SharedPreferences;
+import org.json.JSONArray;
 import com.getcapacitor.annotation.Permission;
 import com.getcapacitor.annotation.PermissionCallback;
 
@@ -373,6 +378,71 @@ public class SmsSenderPlugin extends Plugin {
             case SmsManager.RESULT_ERROR_GENERIC_FAILURE: return "GENERIC";
             default: return "E" + code;
         }
+    }
+
+    // ===== حجب المكالمات (أندرويد 10 فما فوق) =====
+    private static final String ROLE_IN = "android.app.role.CALL_SCREENING";
+    private static final String ROLE_OUT = "android.app.role.CALL_REDIRECTION";
+
+    private boolean hasRole(String role) {
+        if (Build.VERSION.SDK_INT < 29) return false;
+        try {
+            RoleManager rm = (RoleManager) getContext().getSystemService(Context.ROLE_SERVICE);
+            return rm != null && rm.isRoleAvailable(role) && rm.isRoleHeld(role);
+        } catch (Exception e) { return false; }
+    }
+
+    private boolean roleAvailable(String role) {
+        if (Build.VERSION.SDK_INT < 29) return false;
+        try {
+            RoleManager rm = (RoleManager) getContext().getSystemService(Context.ROLE_SERVICE);
+            return rm != null && rm.isRoleAvailable(role);
+        } catch (Exception e) { return false; }
+    }
+
+    @PluginMethod
+    public void getCallBlock(PluginCall call) {
+        SharedPreferences sp = CallPrefs.p(getContext());
+        JSObject r = new JSObject();
+        r.put("supported", Build.VERSION.SDK_INT >= 29);
+        r.put("sdk", Build.VERSION.SDK_INT);
+        r.put("inAvailable", roleAvailable(ROLE_IN));
+        r.put("outAvailable", roleAvailable(ROLE_OUT));
+        r.put("inRole", hasRole(ROLE_IN));
+        r.put("outRole", hasRole(ROLE_OUT));
+        r.put("blockIn", sp.getBoolean("blockIn", false));
+        r.put("blockOut", sp.getBoolean("blockOut", false));
+        r.put("autoReply", sp.getBoolean("autoReply", false));
+        try { r.put("log", new JSONArray(sp.getString("log", "[]"))); } catch (Exception e) { r.put("log", new JSONArray()); }
+        call.resolve(r);
+    }
+
+    @PluginMethod
+    public void setCallBlock(PluginCall call) {
+        SharedPreferences.Editor e = CallPrefs.p(getContext()).edit();
+        if (call.hasOption("blockIn")) e.putBoolean("blockIn", Boolean.TRUE.equals(call.getBoolean("blockIn")));
+        if (call.hasOption("blockOut")) e.putBoolean("blockOut", Boolean.TRUE.equals(call.getBoolean("blockOut")));
+        if (call.hasOption("autoReply")) e.putBoolean("autoReply", Boolean.TRUE.equals(call.getBoolean("autoReply")));
+        if (call.hasOption("replyText")) e.putString("replyText", call.getString("replyText", ""));
+        if (Boolean.TRUE.equals(call.getBoolean("clearLog", false))) e.putString("log", "[]");
+        e.apply();
+        getCallBlock(call);
+    }
+
+    @PluginMethod
+    public void requestCallRole(PluginCall call) {
+        if (Build.VERSION.SDK_INT < 29) { call.reject("حجب المكالمات يتطلب أندرويد 10 أو أحدث"); return; }
+        String role = "out".equals(call.getString("which")) ? ROLE_OUT : ROLE_IN;
+        if (!roleAvailable(role)) { call.reject("هذا الجهاز لا يسمح بهذه الخاصية"); return; }
+        if (hasRole(role)) { getCallBlock(call); return; }
+        RoleManager rm = (RoleManager) getContext().getSystemService(Context.ROLE_SERVICE);
+        startActivityForResult(call, rm.createRequestRoleIntent(role), "callRoleResult");
+    }
+
+    @ActivityCallback
+    private void callRoleResult(PluginCall call, ActivityResult result) {
+        if (call == null) return;
+        getCallBlock(call);
     }
 
     // الاستعلام عن الرصيد برمز USSD (مثل *222#) دون مغادرة التطبيق — أندرويد 8 فما فوق
