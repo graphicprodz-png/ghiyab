@@ -1,0 +1,14 @@
+{
+  "name": "ghiyab",
+  "version": "1.0.0",
+  "description": "تطبيق لإعلام ولي التلميذ بغياب ابنه عن حصة دراسية عبر واتساب أو SMS",
+  "main": "src/server.js",
+  "private": true,
+  "scripts": {
+    "start": "node --no-warnings --env-file-if-exists=.env src/server.js"
+  },
+  "engines": {
+    "node": ">=22.13"
+  },
+  "license": "MIT"
+}
