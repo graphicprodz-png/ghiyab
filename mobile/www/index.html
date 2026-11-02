@@ -83,6 +83,18 @@ td.ltr{direction:ltr;text-align:end}
 .overlay{position:fixed;inset:0;background:rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;z-index:20;padding:16px}
 .dialog{background:#fff;border-radius:16px;padding:16px;max-width:420px;width:100%}
 .hide{display:none!important}
+.segs{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none}
+.segs button{border:0;background:none;padding:8px 12px;border-radius:9px;font-weight:600;white-space:nowrap;cursor:pointer;color:var(--muted)}
+.segs button.on{background:var(--brand);color:#fff}
+.logobox{width:96px;height:96px;border:1.5px dashed var(--line);border-radius:14px;display:flex;align-items:center;justify-content:center;background:#fff;overflow:hidden;text-align:center;font-size:12px}
+.logobox img{max-width:100%;max-height:100%;object-fit:contain}
+.offhead{display:flex;align-items:center;gap:12px;justify-content:center;text-align:center;line-height:1.7;font-size:13.5px}
+.offhead img{width:64px;height:64px;object-fit:contain}
+.offhead.compact{font-size:12px;line-height:1.5}
+.label{position:relative}
+.label .llogo{position:absolute;top:6px;inset-inline-start:6px;width:22px;height:22px;object-fit:contain}
+.printonly{display:none}
+@media print{.printonly{display:block}}
 table.tt{min-width:640px;table-layout:fixed}
 table.tt th{text-align:center;font-size:12.5px;padding:6px 3px}
 table.tt th.tp{width:58px;font-variant-numeric:tabular-nums;color:var(--muted);line-height:1.3}
@@ -103,7 +115,8 @@ table.tt td.full select{font-weight:700;color:var(--brand)}
 </head>
 <body>
 <header>
-  <h1>📋 <span id="schoolTitle">غياب</span></h1>
+  <h1><span id="hLogo">📋</span> <span id="schoolTitle">غياب</span></h1>
+  <div class="sub" id="hDir"></div>
   <div class="sub">تسجيل غياب التلاميذ وإعلام الأولياء آلياً عبر SMS</div>
     <nav id="nav">
     <button data-v="session" class="on">تسجيل الغياب</button>
@@ -122,6 +135,20 @@ table.tt td.full select{font-weight:700;color:var(--brand)}
 /* ============ Data layer: shared db when available, otherwise this browser ============ */
 const DEFAULT_CFG={
   school:"ثانوية النموذجية",
+  schoolType:"ثانوية",
+  directorate:"",
+  schoolCode:"",
+  commune:"",
+  address:"",
+  schoolPhone:"",
+  schoolEmail:"",
+  director:"",
+  counselor:"",
+  attendanceOfficer:"",
+  logo:"",
+  sendWindow:{from:"07:30",to:"18:30"},
+  pin:"",
+  lastBackup:0,
   autoSms:true,
   sameOperator:true,
   simMap:{},
@@ -273,13 +300,29 @@ document.getElementById("nav").addEventListener("click",e=>{
 window.addEventListener("hashchange",()=>{const v=location.hash.slice(1); if(v&&v!==view){view=v;render()}});
 
 /* ============ Views ============ */
+const PROTECTED=["students","timetable","staff","labels","settings"];
+let unlockUntil=0;
+function pinScreen(){
+  return `<div class="card loginbox" style="max-width:340px;margin:8vh auto;text-align:center">
+    <div style="font-size:34px">🔒</div><h2>هذه الصفحة خاصة بالإدارة</h2>
+    <input id="pinIn" type="password" inputmode="numeric" maxlength="6" placeholder="الرمز" style="text-align:center;letter-spacing:6px;font-size:20px;width:100%;direction:ltr" onkeydown="if(event.key==='Enter')checkPin()">
+    ${flashHTML()}
+    <button class="btn" style="width:100%;margin-top:10px" onclick="checkPin()">فتح</button></div>`;
+}
+function checkPin(){
+  if(document.getElementById("pinIn").value===S.cfg.pin){ unlockUntil=Date.now()+15*60000; flashMsg=null; render(); }
+  else toast("الرمز غير صحيح",true);
+}
 function render(){
   document.querySelectorAll("nav button").forEach(b=>b.classList.toggle("on",b.dataset.v===view));
   document.getElementById("schoolTitle").textContent=S.cfg.school||"غياب";
+  document.getElementById("hLogo").innerHTML=S.cfg.logo?`<img src="${S.cfg.logo}" alt="" style="height:30px;width:30px;object-fit:contain;background:#fff;border-radius:8px;padding:2px;vertical-align:middle">`:"📋";
+  document.getElementById("hDir").textContent=S.cfg.directorate?"مديرية التربية لولاية "+S.cfg.directorate:"";
   updateBadge();
   const m=document.getElementById("main");
   const active=document.activeElement&&document.activeElement.id;
-  setTimeout(()=>{ if(view==="settings") smsCount(); },0);
+  setTimeout(()=>{ if(view==="settings"&&setTab==="msg") smsCount(); },0);
+  if(S.cfg.pin&&PROTECTED.includes(view)&&Date.now()>unlockUntil){ m.innerHTML=pinScreen(); setTimeout(()=>{const x=document.getElementById("pinIn"); x&&x.focus()},30); return; }
   m.innerHTML=({session:vSession,notifs:vNotifs,students:vStudents,timetable:vTimetable,staff:vStaff,labels:vLabels,settings:vSettings}[view]||vSession)();
   if(active==="scanInput"){ const s=document.getElementById("scanInput"); if(s) s.focus(); }
 }
@@ -452,6 +495,8 @@ function sendNow(id){ const a=S.absences.find(x=>x.id===id); if(a) put("absences
 let sending=false;
 async function autoSendTick(){
   if(sending||!autoOn()) return;
+  const w=S.cfg.sendWindow||{}, hm=nowHM();
+  if((w.from&&hm<w.from)||(w.to&&hm>w.to)) return; // خارج ساعات الإرسال المسموحة
   const due=S.absences.filter(a=>a.status==="waiting"&&a.notifyAt<=Date.now()&&(a.attempts||0)<3);
   if(!due.length) return;
   sending=true;
@@ -482,7 +527,7 @@ function vStudents(){
   return `<div class="card"><h2>الأقسام</h2>
     ${S.classes.length?`<div class="row" style="margin-bottom:10px">${S.classes.slice().sort((a,b)=>a.name.localeCompare(b.name,"ar")).map(k=>`<button class="btn ${k.id===selClass?"":"ghost"} sm" style="flex:0 0 auto" onclick="pickClass('${k.id}')">${esc(k.name)} <span style="opacity:.7">(${S.students.filter(s=>s.classId===k.id).length})</span></button>`).join("")}</div>`:`<p class="muted">لا توجد أقسام بعد.</p>`}
     <div class="row" style="align-items:end">
-      <label class="f" style="margin:0">المستوى<select id="nLevel">${["1 متوسط","2 متوسط","3 متوسط","4 متوسط","1 ثانوي","2 ثانوي","3 ثانوي"].map(l=>`<option>${l}</option>`).join("")}</select></label>
+      <label class="f" style="margin:0">المستوى<select id="nLevel">${levelsFor(S.cfg.schoolType).map(l=>`<option>${l}</option>`).join("")}</select></label>
       <label class="f" style="margin:0">رقم/اسم الفوج<input id="nGroup" placeholder="مثال: علوم تجريبية 1"></label>
       <button class="btn" style="flex:0 0 auto" onclick="addClass()">+ قسم</button>
     </div>
@@ -569,49 +614,170 @@ function vLabels(){
     <p class="muted" style="margin-top:0">يتولد لكل تلميذ رقم وكودبار (Code 39) تلقائياً. تُلصق في دفتر المراسلة أو الكراس اليومي، ويُمسح بأي قارئ كودبار أو بكاميرا الهاتف.</p>
     <label class="f">القسم<select onchange="labelClass=this.value;render()">${S.classes.map(k=>`<option value="${k.id}" ${k.id===labelClass?"selected":""}>${esc(k.name)}</option>`).join("")}</select></label>
     ${IS_APP?`<p class="muted" style="margin:0">للطباعة: خذ نسخة احتياطية من «الإعدادات»، وافتح ملف التطبيق index.html على الحاسوب، واسترجع النسخة ثم اطبع.</p>`:`<button class="btn" onclick="window.print()">🖨️ طباعة</button>`}</div>
-  ${list.length?`<div class="labels">${list.map(s=>`<div class="label"><div class="ln">${esc(s.name)}</div><div class="lc">${esc(c.name)} · ${esc(S.cfg.school)}</div>${barcodeSVG(s.code)}<div class="code">${esc(s.code)}</div></div>`).join("")}</div>`:`<div class="card empty">لا يوجد تلاميذ في هذا القسم.</div>`}`;
+  <div class="printonly">${officialHeader(true)}<h3 style="text-align:center;margin:4px 0 8px">ملصقات الكودبار — ${esc(c.name)}</h3></div>
+  ${list.length?`<div class="labels">${list.map(s=>`<div class="label">${S.cfg.logo?`<img class="llogo" src="${S.cfg.logo}" alt="">`:""}<div class="ln">${esc(s.name)}</div><div class="lc">${esc(c.name)} · ${esc(S.cfg.school)}</div>${barcodeSVG(s.code)}<div class="code">${esc(s.code)}</div></div>`).join("")}</div>`:`<div class="card empty">لا يوجد تلاميذ في هذا القسم.</div>`}`;
 }
 
 /* --- Settings --- */
+let setTab="school";
+const SET_TABS=[["school","🏫 المؤسسة"],["time","📅 السنة والتوقيت"],["msg","✉️ الرسائل"],["sms","📶 الإرسال والشرائح"],["data","🔒 الحماية والنسخ"],["help","❓ طريقة العمل"]];
 function vSettings(){
+  return `<div class="card noprint" style="padding:8px"><div class="segs">${SET_TABS.map(([k,t])=>`<button class="${k===setTab?"on":""}" onclick="setTab='${k}';flashMsg=null;render()">${t}</button>`).join("")}</div></div>
+  ${flashHTML()}
+  ${({school:setSchool,time:periodsCard,msg:setMsg,sms:setSms,data:setData,help:setHelp}[setTab]||setSchool)()}`;
+}
+const WILAYAS=["أدرار","الشلف","الأغواط","أم البواقي","باتنة","بجاية","بسكرة","بشار","البليدة","البويرة","تمنراست","تبسة","تلمسان","تيارت","تيزي وزو","الجزائر","الجلفة","جيجل","سطيف","سعيدة","سكيكدة","سيدي بلعباس","عنابة","قالمة","قسنطينة","المدية","مستغانم","المسيلة","معسكر","ورقلة","وهران","البيض","إليزي","برج بوعريريج","بومرداس","الطارف","تندوف","تيسمسيلت","الوادي","خنشلة","سوق أهراس","تيبازة","ميلة","عين الدفلى","النعامة","عين تموشنت","غرداية","غليزان","تيميمون","برج باجي مختار","أولاد جلال","بني عباس","عين صالح","عين قزام","تقرت","جانت","المغير","المنيعة"];
+const LEVELS={"ابتدائية":["التحضيري","1 ابتدائي","2 ابتدائي","3 ابتدائي","4 ابتدائي","5 ابتدائي"],"متوسطة":["1 متوسط","2 متوسط","3 متوسط","4 متوسط"],"ثانوية":["1 ثانوي","2 ثانوي","3 ثانوي"]};
+const levelsFor=t=>LEVELS[t]||[...LEVELS["متوسطة"],...LEVELS["ثانوية"]];
+function officialHeader(compact){
   const c=S.cfg;
-  return `<div class="card"><h2>الإعدادات</h2>
-    <label class="f">اسم المؤسسة<input id="cSchool" value="${esc(c.school)}"></label>
+  return `<div class="offhead ${compact?"compact":""}">
+    ${c.logo?`<img src="${c.logo}" alt="">`:""}
+    <div><div>الجمهورية الجزائرية الديمقراطية الشعبية</div><div>وزارة التربية الوطنية</div>
+    ${c.directorate?`<div>مديرية التربية لولاية ${esc(c.directorate)}</div>`:""}
+    <div><b>${esc(c.school||"")}</b>${c.commune?` — ${esc(c.commune)}`:""}</div>
+    ${!compact&&c.schoolYear?`<div>السنة الدراسية ${esc(c.schoolYear)}</div>`:""}</div></div>`;
+}
+function setSchool(){
+  const c=S.cfg; const f=(id,label,val,ph,ltr)=>`<label class="f">${label}<input id="${id}" value="${esc(val||"")}" placeholder="${ph||""}" ${ltr?'style="direction:ltr"':""}></label>`;
+  return `<div class="card"><h2>شعار المؤسسة</h2>
+    <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+      <div class="logobox">${c.logo?`<img src="${c.logo}" alt="الشعار">`:`<span class="muted">لا يوجد شعار</span>`}</div>
+      <div class="row" style="flex:1 1 200px">
+        <label class="btn" style="flex:0 0 auto">اختيار صورة الشعار<input type="file" accept="image/*" class="hide" onchange="pickLogo(this)"></label>
+        ${c.logo?`<button class="btn ghost" style="flex:0 0 auto" onclick="saveCfg({...S.cfg,logo:''})">حذف الشعار</button>`:""}
+      </div></div>
+    <p class="muted" style="margin-bottom:0">يظهر الشعار في أعلى التطبيق وعلى ملصقات الكودبار والوثائق المطبوعة.</p></div>
+  <div class="card"><h2>معلومات المؤسسة</h2>
     <div class="row">
-      <label class="f">مهلة الإشعار بعد تسجيل الغياب (بالدقائق)<input id="cDelay" type="number" min="0" value="${esc(c.delayMin)}"></label>
-      <label class="f">رمز الدولة للهاتف<input id="cCc" value="${esc(c.cc)}" style="direction:ltr"></label>
+      <label class="f">مديرية التربية لولاية<input id="cDir" list="wilayas" value="${esc(c.directorate)}" placeholder="مثال: الجزائر وسط"></label>
+      <label class="f">نوع المؤسسة<select id="cType">${["ابتدائية","متوسطة","ثانوية","أخرى"].map(t=>`<option ${t===c.schoolType?"selected":""}>${t}</option>`).join("")}</select></label>
     </div>
-    <label class="f">نص الرسالة للولي<textarea id="cTpl" style="min-height:110px" oninput="smsCount()">${esc(c.template)}</textarea></label>
+    <datalist id="wilayas">${WILAYAS.map(w=>`<option value="${w}">`).join("")}</datalist>
+    ${f("cSchool","اسم المؤسسة التعليمية",c.school,"مثال: ثانوية الإخوة بوعلام")}
+    <div class="row">${f("cCode","رمز المؤسسة",c.schoolCode,"",true)}${f("cCommune","البلدية",c.commune)}</div>
+    ${f("cAddr","العنوان",c.address)}
+    <div class="row">${f("cTel","هاتف المؤسسة",c.schoolPhone,"0xx xx xx xx",true)}${f("cMail","البريد الإلكتروني",c.schoolEmail,"",true)}</div>
+    <h2 style="margin-top:8px">المسؤولون</h2>
+    <div class="row">${f("cDirector","مدير(ة) المؤسسة",c.director)}${f("cCounselor","مستشار(ة) التربية / الناظر",c.counselor)}</div>
+    ${f("cOfficer","المكلّف بمتابعة الغيابات",c.attendanceOfficer)}
+    <button class="btn" onclick="saveSchool()">حفظ معلومات المؤسسة</button></div>
+  <div class="card"><h2>معاينة رأسية الوثائق</h2>${officialHeader()}</div>`;
+}
+function saveSchool(){
+  const g=id=>document.getElementById(id).value.trim();
+  saveCfg({...S.cfg,directorate:g("cDir"),schoolType:g("cType"),school:g("cSchool")||DEFAULT_CFG.school,schoolCode:g("cCode"),commune:g("cCommune"),address:g("cAddr"),
+    schoolPhone:g("cTel"),schoolEmail:g("cMail"),director:g("cDirector"),counselor:g("cCounselor"),attendanceOfficer:g("cOfficer")});
+  toast("حُفظت معلومات المؤسسة");
+}
+function pickLogo(inp){
+  const f=inp.files&&inp.files[0]; inp.value=""; if(!f) return;
+  const r=new FileReader();
+  r.onload=()=>{ const img=new Image(); img.onload=()=>{
+    const M=256, k=Math.min(1,M/Math.max(img.width,img.height)); const cv=document.createElement("canvas");
+    cv.width=Math.round(img.width*k); cv.height=Math.round(img.height*k); cv.getContext("2d").drawImage(img,0,0,cv.width,cv.height);
+    saveCfg({...S.cfg,logo:cv.toDataURL("image/png")}); toast("حُفظ الشعار"); };
+    img.onerror=()=>toast("تعذّرت قراءة الصورة",true); img.src=r.result; };
+  r.readAsDataURL(f);
+}
+function setMsg(){
+  const c=S.cfg, w=c.sendWindow||{};
+  return `<div class="card"><h2>رسالة الولي</h2>
+    <label class="f">نص الرسالة<textarea id="cTpl" style="min-height:110px" oninput="smsCount()">${esc(c.template)}</textarea></label>
     <p class="muted" id="smsCnt" style="margin-top:-4px"></p>
     <p class="muted" style="margin-top:-4px">المتغيرات: {الاسم} {الرقم} {القسم} {المادة} {الأستاذ} {التاريخ} {من} {إلى} {المؤسسة}</p>
-    <div class="row"><button class="btn" onclick="saveSettings()">حفظ</button><button class="btn ghost" onclick="document.getElementById('cTpl').value=DEFAULT_CFG.template">استرجاع النص الافتراضي</button></div>
-  </div>
-  ${flashHTML()}
-  ${periodsCard()}
-  <div class="card"><h2>الإرسال الآلي عبر SMS</h2>
+    <div class="row">
+      <label class="f">إرسال الرسالة بعد تسجيل الغياب بـ (دقيقة)<input id="cDelay" type="number" min="0" value="${esc(c.delayMin)}"></label>
+      <label class="f">رمز الدولة للهاتف<input id="cCc" value="${esc(c.cc)}" style="direction:ltr"></label>
+    </div>
+    <div class="row">
+      <label class="f">لا تُرسل الرسائل قبل الساعة<input id="cWFrom" type="time" value="${esc(w.from||"")}"></label>
+      <label class="f">ولا بعد الساعة<input id="cWTo" type="time" value="${esc(w.to||"")}"></label>
+    </div>
+    <p class="muted" style="margin-top:-4px">الرسائل المستحقة خارج هذه الساعات تنتظر إلى بداية الفترة المسموحة في اليوم الموالي.</p>
+    <div class="row"><button class="btn" onclick="saveSettings()">حفظ</button><button class="btn ghost" onclick="document.getElementById('cTpl').value=DEFAULT_CFG.template;smsCount()">استرجاع النص الافتراضي</button></div>
+  </div>`;
+}
+function setSms(){
+  return `<div class="card"><h2>الإرسال الآلي عبر SMS</h2>
     ${IS_APP?`<label class="switch"><input type="checkbox" ${S.cfg.autoSms?"checked":""} onchange="saveCfg({...S.cfg,autoSms:this.checked})"> إرسال SMS آلياً من شريحة هذا الجهاز عند حلول الموعد</label>
       <p class="muted" style="margin-top:0">تُرسل الرسائل من رصيد الشريحة. اترك التطبيق مفتوحاً أثناء الدوام (الشاشة لا تنطفئ ما دام مفتوحاً). أي رسالة تأخرت تُرسل فور فتح التطبيق.</p>
       <div class="row" style="align-items:end"><label class="f" style="margin:0">رقم لتجربة الإرسال<input id="testPhone" inputmode="tel" placeholder="0550 12 34 56" style="direction:ltr"></label>
       <button class="btn ghost" style="flex:0 0 auto" onclick="testSms()">إرسال رسالة تجريبية</button></div>
       <p class="muted" style="margin:4px 0 0">تُرسل الرسالة التجريبية من الشريحة المناسبة لمتعامل الرقم المكتوب.</p>`
     :`<p class="muted" style="margin:0">الإرسال الآلي يعمل فقط في تطبيق الطابليت (APK) لأنه يستعمل شريحة الجهاز.</p>`}
-  </div>
-  ${simsCard()}
-  <div class="card"><h2>نسخة احتياطية</h2>
+  </div>${simsCard()}`;
+}
+function setData(){
+  const c=S.cfg, days=c.lastBackup?Math.floor((Date.now()-c.lastBackup)/86400000):null;
+  return `<div class="card"><h2>رمز الحماية (PIN)</h2>
+    <p class="muted" style="margin-top:0">يمنع غير الإدارة من تعديل الأقسام والتلاميذ والجدول والأساتذة والإعدادات. المشرف يستطيع تسجيل الغياب ومتابعة الإشعارات بدون رمز.</p>
+    ${c.pin?`<p><span class="tag ok">الحماية مفعّلة</span></p>`:""}
+    <div class="row" style="align-items:end">
+      <label class="f" style="margin:0">${c.pin?"رمز جديد":"الرمز (4 إلى 6 أرقام)"}<input id="newPin" type="password" inputmode="numeric" maxlength="6" style="direction:ltr;letter-spacing:4px"></label>
+      <button class="btn" style="flex:0 0 auto" onclick="setPin()">${c.pin?"تغيير الرمز":"تفعيل الحماية"}</button>
+      ${c.pin?`<button class="btn ghost" style="flex:0 0 auto" onclick="saveCfg({...S.cfg,pin:''});toast('أُلغيت الحماية')">إلغاء الحماية</button>`:""}
+    </div></div>
+  <div class="card"><h2>النسخة الاحتياطية</h2>
     <p class="muted" style="margin-top:0">البيانات محفوظة على هذا الجهاز فقط. خذ نسخة احتياطية كل أسبوع، وبها تنقل البيانات إلى جهاز آخر.</p>
+    <p>${days==null?`<span class="tag amb">لم تُؤخذ أي نسخة احتياطية بعد</span>`:days>7?`<span class="tag amb">آخر نسخة منذ ${days} يوماً</span>`:`<span class="tag ok">آخر نسخة: ${new Date(c.lastBackup).toLocaleDateString("ar-DZ")}</span>`}</p>
     <div class="row">
       <button class="btn" onclick="showBackup()">أخذ نسخة احتياطية</button>
       <label class="btn ghost">استرجاع من ملف<input type="file" accept=".json,application/json,text/plain" class="hide" onchange="restoreFile(this)"></label>
       <button class="btn ghost" onclick="restorePaste()">استرجاع بلصق النص</button>
     </div></div>
-  <div class="card"><h2>طريقة العمل</h2>
+  <div class="card"><h2>سجل الغيابات (Excel)</h2>
+    <div class="row" style="align-items:end">
+      <label class="f" style="margin:0">من<input type="date" id="exFrom" value="${todayStr().slice(0,8)}01"></label>
+      <label class="f" style="margin:0">إلى<input type="date" id="exTo" value="${todayStr()}"></label>
+      <button class="btn ghost" style="flex:0 0 auto" onclick="exportAbsences()">تصدير</button>
+    </div>
+    <p class="muted" style="margin-bottom:0">${IS_APP?"يُنسخ الجدول، ثم الصقه في Excel أو Google Sheets.":"يُنزَّل ملف CSV يُفتح في Excel."}</p></div>
+  <div class="card"><h2>بداية سنة دراسية جديدة</h2>
+    <p class="muted" style="margin-top:0">يحذف سجل الغيابات القديم ويُبقي الأقسام والتلاميذ والأساتذة والجدول. خذ نسخة احتياطية قبل ذلك.</p>
+    <button class="btn ghost" onclick="confirmBox('حذف سجل الغيابات كاملاً؟','سيُحذف ${S.absences.length} غياب. لا يمكن التراجع.',()=>{S.absences=[];saveLocal();render();toast('حُذف سجل الغيابات')})">حذف سجل الغيابات</button></div>
+  <div class="card" style="border-color:var(--red)"><h2 style="color:var(--red)">حذف كل البيانات</h2>
+    <p class="muted" style="margin-top:0">يحذف كل شيء من هذا الجهاز: المؤسسة والأقسام والتلاميذ والغيابات والإعدادات.</p>
+    <div class="row" style="align-items:end"><label class="f" style="margin:0">اكتب كلمة «حذف» للتأكيد<input id="wipeTxt"></label>
+    <button class="btn red" style="flex:0 0 auto" onclick="wipeAll()">حذف كل البيانات</button></div></div>`;
+}
+function setHelp(){
+  return `<div class="card"><h2>طريقة العمل</h2>
     <ol style="margin:0;padding-inline-start:20px;line-height:1.9">
-      <li>الإدارة تُدخل الأقسام والتلاميذ وأرقام الأولياء، فيتولد لكل تلميذ رقم وكودبار.</li>
-      <li>تُدخل المواد والأساتذة وجدول توقيت كل قسم، مع أستاذ كل مادة.</li>
-      <li>تُطبع الملصقات وتُلصق في الدفتر اليومي لكل تلميذ.</li>
-      <li>في «تسجيل الغياب» تظهر الحصص الجارية الآن حسب الجدول (القسم، المادة، الأستاذ، التوقيت). يضغط المشرف على الحصة ويسجّل الغائبين بالضغط على أسمائهم أو بمسح الكودبار.</li>
-      <li>بعد المهلة المحددة يرسل التطبيق SMS آلياً لولي كل تلميذ غائب من شريحة الطابليت (موبيليس أو جيزي أو أوريدو، حسب متعامل الولي إن وُجدت عدة شرائح)، ويمكن أيضاً الإرسال يدوياً عبر واتساب.</li>
+      <li>«الإعدادات ← المؤسسة»: الشعار، مديرية التربية، اسم المؤسسة والمسؤولين.</li>
+      <li>«الأقسام والتلاميذ»: الأقسام، ثم التلاميذ وأرقام أوليائهم (يمكن اللصق من Excel). يتولد لكل تلميذ رقم وكودبار.</li>
+      <li>«المواد والأساتذة» ثم «جدول التوقيت»: جدول كل قسم مع أستاذ كل مادة.</li>
+      <li>«ملصقات الكودبار»: تُطبع وتُلصق في الدفتر اليومي لكل تلميذ.</li>
+      <li>«تسجيل الغياب»: تظهر الحصص الجارية الآن حسب الجدول. يضغط المشرف على الحصة ثم على أسماء الغائبين أو يمسح الكودبار.</li>
+      <li>بعد المهلة المحددة يرسل التطبيق SMS آلياً لولي كل غائب من شريحة الطابليت (موبيليس أو جيزي أو أوريدو).</li>
+      <li>«الإشعارات»: متابعة ما أُرسل وما ينتظر وما يحتاج تدخلاً (SMS يدوي أو واتساب).</li>
     </ol></div>`;
+}
+function setPin(){
+  const v=document.getElementById("newPin").value.trim();
+  if(!/^\d{4,6}$/.test(v)) return toast("الرمز من 4 إلى 6 أرقام",true);
+  unlockUntil=Date.now()+15*60000; saveCfg({...S.cfg,pin:v}); toast("فُعّلت الحماية");
+}
+function wipeAll(){
+  if(document.getElementById("wipeTxt").value.trim()!=="حذف") return toast("اكتب كلمة «حذف» للتأكيد",true);
+  try{ localStorage.removeItem(LS_KEY); localStorage.removeItem("ghiyab_session"); }catch(e){}
+  location.reload();
+}
+function exportAbsences(){
+  const from=document.getElementById("exFrom").value, to=document.getElementById("exTo").value;
+  const rows=S.absences.filter(a=>a.date>=from&&a.date<=to).sort((a,b)=>(a.date+a.from).localeCompare(b.date+b.from));
+  if(!rows.length) return toast("لا توجد غيابات في هذه الفترة",true);
+  const st={sent:"أُرسل",waiting:"في الانتظار",sending:"جارِ الإرسال",failed:"لم يُرسل"};
+  const head=["التاريخ","من","إلى","القسم","رقم التلميذ","التلميذ","المادة","الأستاذ","هاتف الولي","حالة الإشعار","الوسيلة"];
+  const data=rows.map(a=>{ const s=S.students.find(x=>x.id===a.studentId)||{}; const c=cls(a.classId);
+    return [fmtDate(a.date),a.from,a.to,c?c.name:a.className,s.code||a.code,s.name||a.studentName,a.subject,a.teacher,s.phone||"",st[a.status]||a.status,({sms:"SMS",whatsapp:"واتساب",manual:"أخرى"})[a.channel]||""]; });
+  if(IS_APP){
+    const tsv=[head,...data].map(r=>r.map(v=>String(v??"").replace(/[\t\n]/g," ")).join("\t")).join("\n");
+    navigator.clipboard.writeText(tsv).then(()=>toast(`نُسخ ${rows.length} سطراً — الصقه في Excel`),()=>toast("تعذّر النسخ",true));
+  }else{
+    const csv="﻿"+[head,...data].map(r=>r.map(v=>'"'+String(v??"").replace(/"/g,'""')+'"').join(",")).join("\r\n");
+    const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv;charset=utf-8"})); a.download=`غيابات-${from}-${to}.csv`; a.click();
+  }
 }
 function simsCard(){
   const sims=S.cfg.simsCache||[], m=S.cfg.simMap||{};
@@ -649,8 +815,9 @@ function smsCount(){
   out.innerHTML=`مثال: ${n} حرفاً ≈ <b>${parts}</b> ${parts===1?"رسالة":"رسائل"} SMS لكل غياب (الرسالة العربية الواحدة 70 حرفاً). كلما قصُر النص قلّت التكلفة.`;
 }
 function saveSettings(){
-  saveCfg({...S.cfg,school:document.getElementById("cSchool").value.trim()||DEFAULT_CFG.school,delayMin:Math.max(0,Number(document.getElementById("cDelay").value)||0),
-    cc:document.getElementById("cCc").value.replace(/\D/g,"")||"213",template:document.getElementById("cTpl").value});
+  saveCfg({...S.cfg,delayMin:Math.max(0,Number(document.getElementById("cDelay").value)||0),
+    cc:document.getElementById("cCc").value.replace(/\D/g,"")||"213",template:document.getElementById("cTpl").value,
+    sendWindow:{from:document.getElementById("cWFrom").value,to:document.getElementById("cWTo").value}});
   toast("حُفظت الإعدادات");
 }
 
@@ -663,10 +830,10 @@ function showBackup(){
     <p class="muted">انسخ النص واحفظه، مثلاً أرسله لنفسك عبر واتساب أو البريد.</p>
     <textarea id="bkTxt" readonly style="width:100%;min-height:160px;direction:ltr;font-size:11px">${esc(t)}</textarea>
     <div class="row" style="margin-top:8px"><button class="btn" onclick="copyBackup()">نسخ</button>
-    ${IS_APP?"":`<a class="btn ghost" download="ghiyab-${todayStr()}.json" href="data:application/json;charset=utf-8,${encodeURIComponent(t)}">تنزيل ملف</a>`}
+    ${IS_APP?"":`<a class="btn ghost" onclick="S.cfg.lastBackup=Date.now();saveLocal()" download="ghiyab-${todayStr()}.json" href="data:application/json;charset=utf-8,${encodeURIComponent(t)}">تنزيل ملف</a>`}
     <button class="btn ghost" onclick="closeModal()">إغلاق</button></div></div></div>`;
 }
-async function copyBackup(){ const el=document.getElementById("bkTxt"); try{await navigator.clipboard.writeText(el.value); toast("نُسخت النسخة الاحتياطية")}catch(e){ el.select(); try{document.execCommand("copy");toast("نُسخت النسخة الاحتياطية")}catch(_){toast("انسخ النص يدوياً",true)} } }
+async function copyBackup(){ const el=document.getElementById("bkTxt"); S.cfg.lastBackup=Date.now(); saveLocal(); try{await navigator.clipboard.writeText(el.value); toast("نُسخت النسخة الاحتياطية")}catch(e){ el.select(); try{document.execCommand("copy");toast("نُسخت النسخة الاحتياطية")}catch(_){toast("انسخ النص يدوياً",true)} } }
 function applyBackup(txt){
   let d; try{ d=JSON.parse(txt) }catch(e){ return toast("الملف غير صالح",true) }
   if(!d||d.app!=="ghiyab"||!Array.isArray(d.students)) return toast("هذه ليست نسخة احتياطية لتطبيق غياب",true);
