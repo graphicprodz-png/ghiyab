@@ -168,14 +168,14 @@ public class SmsSenderPlugin extends Plugin {
                     Uri found = null;
                     try (Cursor c = res.query(MediaStore.Downloads.EXTERNAL_CONTENT_URI, new String[]{ MediaStore.Downloads._ID },
                             MediaStore.Downloads.DISPLAY_NAME + "=? AND " + MediaStore.Downloads.RELATIVE_PATH + "=?",
-                            new String[]{ name, Environment.DIRECTORY_DOWNLOADS + "/Ghiyab/" }, null)) {
+                            new String[]{ name, Environment.DIRECTORY_DOWNLOADS + "/Hodouri/" }, null)) {
                         if (c != null && c.moveToFirst()) found = ContentUris.withAppendedId(MediaStore.Downloads.EXTERNAL_CONTENT_URI, c.getLong(0));
                     } catch (Exception ignored) { }
                     if (found != null) {
                         try (OutputStream os = res.openOutputStream(found, "wt")) {
                             os.write(data);
                             JSObject r = new JSObject();
-                            r.put("path", "Download/Ghiyab/" + name);
+                            r.put("path", "Download/Hodouri/" + name);
                             call.resolve(r);
                             return;
                         } catch (Exception ignored) { }
@@ -184,11 +184,11 @@ public class SmsSenderPlugin extends Plugin {
                 ContentValues v = new ContentValues();
                 v.put(MediaStore.Downloads.DISPLAY_NAME, name);
                 v.put(MediaStore.Downloads.MIME_TYPE, mime);
-                v.put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS + "/Ghiyab");
+                v.put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS + "/Hodouri");
                 Uri uri = res.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, v);
                 if (uri == null) throw new Exception("تعذّر إنشاء الملف");
                 try (OutputStream os = res.openOutputStream(uri)) { os.write(data); }
-                path = "Download/Ghiyab/" + name;
+                path = "Download/Hodouri/" + name;
             } else {
                 File dir = getContext().getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS);
                 File f = new File(dir, name);

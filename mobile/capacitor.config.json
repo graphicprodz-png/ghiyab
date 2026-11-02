@@ -1,6 +1,6 @@
 {
   "appId": "dz.ghiyab.app",
-  "appName": "غياب",
+  "appName": "حضوري",
   "webDir": "www",
   "android": {
     "backgroundColor": "#f4f6f5"

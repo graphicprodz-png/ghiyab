@@ -65,21 +65,21 @@ jobs:
           BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
           IN=android/app/build/outputs/apk/release/app-release-unsigned.apk
           "$BT/zipalign" -f -p 4 "$IN" aligned.apk
-          "$BT/apksigner" sign --ks ghiyab.keystore --ks-key-alias ghiyab --ks-pass pass:ghiyab123 --key-pass pass:ghiyab123 --out ghiyab.apk aligned.apk
-          "$BT/apksigner" verify ghiyab.apk
-          ls -la ghiyab.apk
+          "$BT/apksigner" sign --ks ghiyab.keystore --ks-key-alias ghiyab --ks-pass pass:ghiyab123 --key-pass pass:ghiyab123 --out hodouri.apk aligned.apk
+          "$BT/apksigner" verify hodouri.apk
+          ls -la hodouri.apk
 
       - uses: actions/upload-artifact@v4
         with:
-          name: ghiyab-apk
-          path: mobile/ghiyab.apk
+          name: hodouri-apk
+          path: mobile/hodouri.apk
 
       - name: نشر نسخة للتحميل
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v1.${{ github.run_number }}
-          name: غياب — الإصدار 1.${{ github.run_number }}
+          name: حضوري – HODOURI — الإصدار 1.${{ github.run_number }}
           body: |
-            ملف التثبيت على الطابليت: **ghiyab.apk**
+            ملف التثبيت على الطابليت: **hodouri.apk**
             حمّله من الطابليت، افتحه، واسمح بتثبيت التطبيقات من مصادر غير معروفة إذا طُلب ذلك.
-          files: mobile/ghiyab.apk
+          files: mobile/hodouri.apk
