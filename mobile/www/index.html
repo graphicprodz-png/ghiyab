@@ -94,6 +94,39 @@ td.ltr{direction:ltr;text-align:end}
 .label{position:relative}
 .label .llogo{position:absolute;top:6px;inset-inline-start:6px;width:22px;height:22px;object-fit:contain}
 .printonly{display:none}
+.years{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-bottom:12px}
+.years button{border:2px solid var(--line);background:#fff;border-radius:14px;padding:16px 10px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:2px;font-size:17px}
+.years button span{font-size:12.5px;color:var(--muted)}
+.years button.on{border-color:var(--brand);background:var(--brand-2);color:var(--brand)}
+.btn.big{width:100%;padding:14px;font-size:16.5px;border-radius:12px}
+.tbar{display:flex;gap:10px;align-items:flex-start}
+table.wk{min-width:760px;table-layout:fixed;border-collapse:separate;border-spacing:3px}
+table.wk th{font-size:12.5px;text-align:center;padding:4px}
+table.wk th span{color:var(--muted);font-weight:400}
+table.wk td{background:#fafcfb;border:1px solid var(--line);border-radius:8px;padding:6px 4px;text-align:center;vertical-align:top;height:52px}
+table.wk td b{display:block;font-size:12.5px}
+table.wk td span{display:block;font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+table.wk tr.today td,table.wk tr.today th{background:#e3f4ea;cursor:pointer}
+table.wk tr.today td.cur{background:#1f9d55;color:#fff;border-color:#1f9d55}
+table.wk tr.today td.cur span{color:#e9fff1}
+.dslot{display:flex;align-items:center;gap:14px;width:100%;text-align:start;background:#fff;border:1.5px solid var(--line);border-radius:14px;padding:14px;margin-bottom:8px;cursor:pointer}
+.dslot .dt{font-variant-numeric:tabular-nums;font-weight:700;color:var(--muted);min-width:52px;text-align:center;line-height:1.35}
+.dslot .dm{flex:1;display:flex;flex-direction:column}.dslot .dm b{font-size:17px}.dslot .dm span{color:var(--muted);font-size:13.5px}
+.dslot.cur{background:#1f9d55;border-color:#1f9d55;color:#fff}.dslot.cur .dm span,.dslot.cur .dt{color:#e9fff1}
+.dslot.past{opacity:.75}.dslot.done{border-color:#9fd8b5}
+.roster{display:flex;flex-direction:column;gap:6px}
+.rrow{display:flex;align-items:center;gap:12px;background:#fff;border:1.5px solid var(--line);border-radius:12px;padding:12px 14px;cursor:pointer;text-align:start;font-size:16px}
+.rrow .rn{min-width:26px;color:var(--muted);font-variant-numeric:tabular-nums}
+.rrow .rname{flex:1;font-weight:600}
+.rrow .rst{font-weight:700;color:var(--brand);background:var(--brand-2);border-radius:99px;padding:3px 14px;font-size:14px;white-space:nowrap}
+.rrow.abs{border-color:var(--red);background:var(--red-2)}.rrow.abs .rname{color:var(--red)}
+.rrow.abs .rst{background:var(--red);color:#fff}
+.rrow:disabled{opacity:.8;cursor:default}
+.savebar{position:sticky;bottom:0;background:var(--bg);padding:10px 0;display:flex;align-items:center;justify-content:space-between;gap:10px;border-top:1px solid var(--line);margin-top:8px}
+.roundcard{display:flex;align-items:center;gap:12px;cursor:pointer;flex-wrap:wrap}
+.roundcard>div:first-child{flex:1}
+.prog{flex:1 1 120px;height:9px;background:var(--brand-2);border-radius:99px;overflow:hidden}.prog i{display:block;height:100%;background:var(--brand)}
+.mv{border:0;background:none;color:var(--muted);cursor:pointer;padding:0 2px;font-size:11px}
 .rtool{display:flex;gap:8px;align-items:center;flex-wrap:wrap;background:#fff;border:1px solid var(--line);border-radius:12px;padding:8px;margin-bottom:10px}
 .rtool .zoom{display:inline-flex;gap:4px;align-items:center;margin-inline-start:auto}
 .rtool .zoom b{min-width:46px;text-align:center;font-variant-numeric:tabular-nums}
@@ -151,7 +184,8 @@ table.tt td.full select{font-weight:700;color:var(--brand)}
   <div class="sub" id="hDir"></div>
   <div class="sub">تسجيل غياب التلاميذ وإعلام الأولياء آلياً عبر SMS</div>
     <nav id="nav">
-    <button data-v="session" class="on">تسجيل الغياب</button>
+    <button data-v="session" class="on">🏠 الرئيسية</button>
+    <button data-v="round">دورة الفترة</button>
     <button data-v="sessions">سجل الحصص</button>
     <button data-v="notifs">الإشعارات <span class="badge hide" id="dueBadge">0</span></button>
     <button data-v="students">الأقسام والتلاميذ</button>
@@ -180,6 +214,7 @@ const DEFAULT_CFG={
   attendanceOfficer:"",
   logo:"",
   sendWindow:{from:"07:30",to:"18:30"},
+  sendMode:"auto",
   pin:"",
   lastBackup:0,
   autoSms:true,
@@ -328,6 +363,7 @@ function flashHTML(){ return flashMsg?`<div class="flash ${flashMsg.err?"err":"o
 
 document.getElementById("nav").addEventListener("click",e=>{
   const b=e.target.closest("button[data-v]"); if(!b) return;
+  if(view==="att"&&attDirty()){ const to=b.dataset.v; return askBox("لم تحفظ الغيابات","هل تريد الحفظ قبل الخروج؟","حفظ",()=>{ saveAttendance(true); view=to; render(); },"خروج بدون حفظ",()=>{ att=null; view=to; render(); }); }
   view=b.dataset.v; flashMsg=null; try{history.replaceState(null,"","#"+view)}catch(_){ } render(); window.scrollTo(0,0);
 });
 window.addEventListener("hashchange",()=>{const v=location.hash.slice(1); if(v&&v!==view){view=v;render()}});
@@ -357,7 +393,7 @@ function render(){
   const active=document.activeElement&&document.activeElement.id;
   setTimeout(()=>{ if(view==="settings"&&setTab==="msg") smsCount(); },0);
   if(S.cfg.pin&&PROTECTED.includes(view)&&Date.now()>unlockUntil){ m.innerHTML=pinScreen(); setTimeout(()=>{const x=document.getElementById("pinIn"); x&&x.focus()},30); return; }
-  m.innerHTML=({session:vSession,sessions:vSessions,report:vReport,notifs:vNotifs,students:vStudents,timetable:vTimetable,staff:vStaff,labels:vLabels,settings:vSettings}[view]||vSession)();
+  m.innerHTML=({session:vHome,round:vRound,week:vWeek,day:vDay,att:vAtt,sessions:vSessions,report:vReport,notifs:vNotifs,students:vStudents,timetable:vTimetable,staff:vStaff,labels:vLabels,settings:vSettings}[view]||vSession)();
   if(active==="scanInput"){ const s=document.getElementById("scanInput"); if(s) s.focus(); }
 }
 
@@ -368,64 +404,214 @@ function emptyData(){
     <div style="font-size:34px">🏫</div>
     <p>لا توجد أقسام ولا تلاميذ بعد.</p>
     <div class="row" style="justify-content:center;max-width:420px;margin:auto">
-      <button class="btn" onclick="seedDemo()">إضافة بيانات تجريبية (قسم 2 ثانوية، 25 تلميذاً)</button>
+      <button class="btn" onclick="seedDemo()">إضافة بيانات تجريبية (4 أقسام بجداولها)</button>
       <button class="btn ghost" onclick="view='students';render()">إضافة الأقسام يدوياً</button>
     </div></div>`;
 }
 
 /* --- Session / attendance --- */
-function vSession(){
+/* ============ التدفق الرئيسي: السنة ← القسم ← الجدول الأسبوعي ← اليوم ← الحصة ============ */
+const classStudents=cid=>S.students.filter(s=>s.classId===cid); // ترتيب القائمة الرسمية
+function moveStudent(id,dir){
+  const st=S.students.find(x=>x.id===id); const same=S.students.filter(x=>x.classId===st.classId);
+  const i=same.indexOf(st), j=i+dir; if(j<0||j>=same.length) return;
+  const a=S.students.indexOf(same[i]), b=S.students.indexOf(same[j]); [S.students[a],S.students[b]]=[S.students[b],S.students[a]];
+  saveLocal(); render();
+}
+const ORD=["","الأولى","الثانية","الثالثة","الرابعة","الخامسة"];
+function yearLabel(lv){ if(/التحضيري/.test(lv)) return "التحضيري"; const m=String(lv).match(/^(\d)\s*(.*)$/); return m?`السنة ${ORD[+m[1]]||m[1]}`:lv; }
+function yearSub(lv){ const m=String(lv).match(/^\d\s*(.*)$/); return m?m[1]:""; }
+const shortClass=c=>String(c.name).replace(String(c.level)+" — ","").replace(String(c.level),"").trim()||c.name;
+let homeLevel=lsGet("ghiyab_level"), homeClass=lsGet("ghiyab_class");
+function vHome(){
   if(!S.classes.length) return emptyData();
-  if(!session){
-    const t=nowHM();
-    return `${timetableNowCard()}
+  const order=levelsFor(S.cfg.schoolType); const lvls=[...new Set(S.classes.map(c=>c.level))].sort((a,b)=>(order.indexOf(a)+99)%99-(order.indexOf(b)+99)%99||a.localeCompare(b));
+  if(!lvls.includes(homeLevel)) homeLevel=lvls[0];
+  const classes=S.classes.filter(c=>c.level===homeLevel).sort((a,b)=>a.name.localeCompare(b.name,"ar",{numeric:true}));
+  if(!classes.some(c=>c.id===homeClass)) homeClass=null;
+  return `${roundSummary()}
+  <div class="card"><h2>1. اختر السنة</h2><div class="years">${lvls.map(l=>`<button class="${l===homeLevel?"on":""}" onclick="homeLevel='${esc(l)}';lsSet('ghiyab_level',homeLevel);homeClass=null;render()"><b>${yearLabel(l)}</b><span>${esc(yearSub(l))}</span></button>`).join("")}</div></div>
+  <div class="card"><h2>2. اختر القسم — ${yearLabel(homeLevel)} ${esc(yearSub(homeLevel))}</h2><div class="years">${classes.map(c=>`<button class="${c.id===homeClass?"on":""}" onclick="homeClass='${c.id}';lsSet('ghiyab_class',homeClass);render()"><b>${esc(shortClass(c))}</b><span>${classStudents(c.id).length} تلميذ</span></button>`).join("")}</div>
+    <button class="btn big" ${homeClass?"":"disabled"} onclick="view='week';render();window.scrollTo(0,0)">📅 دخول إلى جدول التوقيت الأسبوعي</button></div>
+  ${flashHTML()}
+  <details class="card"><summary style="cursor:pointer;font-weight:700">حصة خارج الجدول (تعويض، تغيير...)</summary>
+    <div style="margin-top:10px">
+    <label class="f">القسم<select id="sClass" onchange="fillTeacher()">${S.classes.map(c=>`<option value="${c.id}" ${c.id===homeClass?"selected":""}>${esc(c.name)}</option>`).join("")}</select></label>
+    <div class="row">
+      <label class="f">المادة<select id="sSubject" onchange="fillTeacher()"><option value="">—</option>${S.subjects.map(x=>`<option value="${esc(x.name)}" data-id="${x.id}">${esc(x.name)}</option>`).join("")}</select></label>
+      <label class="f">الأستاذ(ة)<input id="sTeacher" list="teachersList" placeholder="اسم الأستاذ"></label>
+    </div>
+    <datalist id="teachersList">${S.teachers.map(x=>`<option value="${esc(x.name)}">`).join("")}</datalist>
+    <div class="row">
+      <label class="f">التاريخ<input type="date" id="sDate" value="${todayStr()}"></label>
+      <label class="f">من الساعة<input type="time" id="sFrom" value="${nowHM()}"></label>
+      <label class="f">إلى الساعة<input type="time" id="sTo" value="${addHM(nowHM(),60)}"></label>
+    </div>
+    <button class="btn" onclick="startSession()" style="width:100%;margin-top:4px">فتح قائمة التلاميذ</button>
+  </div></details>`;
+}
+// الجدول الأسبوعي للقسم: يوم اليوم بالأخضر الخفيف، والحصة الحالية بالأخضر
+function vWeek(){
+  const c=cls(homeClass); if(!c){ view="session"; return vHome(); }
+  const days=schoolDays(), pers=sortedPeriods(), today=new Date().getDay(), now=hmMin(nowHM());
+  const isToday=days.includes(today);
+  return `<div class="card"><div class="tbar"><button class="btn ghost sm" onclick="view='session';render()">→ رجوع</button>
+      <div><h2 style="margin:0">جدول التوقيت الأسبوعي — ${esc(c.name)}</h2><div class="muted">السنة الدراسية ${esc(S.cfg.schoolYear||"")}</div></div></div></div>
+    ${isToday?`<button class="btn big" style="margin-bottom:10px" onclick="openDay()">📋 فتح جدول اليوم (${DAY_NAMES[today]})</button>`:`<div class="banner amb">اليوم (${DAY_NAMES[today]}) ليس يوم دراسة حسب الإعدادات.</div>`}
+    <div class="card" style="overflow-x:auto;padding:8px">
+    <table class="wk"><tr><th></th>${pers.map(p=>`<th>${p.from}<br><span>${p.to}</span></th>`).join("")}</tr>
+    ${days.map(d=>`<tr class="${d===today?"today":""}" ${d===today?'onclick="openDay()"':""}><th>${DAY_NAMES[d]}${d===today?'<br><span class="tag ok">اليوم</span>':""}</th>
+      ${pers.map(p=>{ const sl=slotAt(c.id,d,p.id); const cur=d===today&&now>=hmMin(p.from)&&now<hmMin(p.to); const t=sl&&slotTeacher(sl);
+        return `<td class="${cur?"cur":""}">${sl&&subj(sl.subjectId)?`<b>${esc(subj(sl.subjectId).name)}</b><span>${t?esc(t.name):""}</span>`:""}</td>`; }).join("")}</tr>`).join("")}
+    </table></div>
+    ${!S.timetable.some(x=>x.classId===c.id)?`<div class="banner amb">جدول هذا القسم فارغ. أدخله من «جدول التوقيت».</div>`:""}`;
+}
+function openDay(){ view="day"; render(); window.scrollTo(0,0); }
+// جدول اليوم للقسم: الحصة الموافقة لساعة الطابليت بالأخضر
+function vDay(){
+  const c=cls(homeClass); if(!c){ view="session"; return vHome(); }
+  const now=hmMin(nowHM()), d=new Date().getDay();
+  const list=S.timetable.filter(x=>x.classId===c.id&&x.day===d&&period(x.periodId)&&subj(x.subjectId)).map(x=>({...x,p:period(x.periodId)})).sort((a,b)=>a.p.from.localeCompare(b.p.from));
+  return `<div class="card"><div class="tbar"><button class="btn ghost sm" onclick="view='week';render()">→ الأسبوع</button>
+      <div><h2 style="margin:0">${DAY_NAMES[d]} ${fmtDate(todayStr())} — ${esc(c.name)}</h2><div class="muted">اضغط على الحصة لفتح قائمة التلاميذ</div></div></div></div>
     ${flashHTML()}
-    <details class="card" ${S.timetable.length?"":"open"}><summary style="cursor:pointer;font-weight:700">حصة خارج الجدول (تعويض، تغيير...)</summary>
-      <div style="margin-top:10px">
-      <label class="f">القسم<select id="sClass" onchange="fillTeacher()">${S.classes.map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join("")}</select></label>
-      <div class="row">
-        <label class="f">المادة<select id="sSubject" onchange="fillTeacher()"><option value="">—</option>${S.subjects.map(x=>`<option value="${esc(x.name)}" data-id="${x.id}">${esc(x.name)}</option>`).join("")}</select></label>
-        <label class="f">الأستاذ(ة)<input id="sTeacher" list="teachersList" placeholder="اسم الأستاذ"></label>
-      </div>
-      <datalist id="teachersList">${S.teachers.map(x=>`<option value="${esc(x.name)}">`).join("")}</datalist>
-      <div class="row">
-        <label class="f">التاريخ<input type="date" id="sDate" value="${todayStr()}"></label>
-        <label class="f">من الساعة<input type="time" id="sFrom" value="${t}"></label>
-        <label class="f">إلى الساعة<input type="time" id="sTo" value="${addHM(t,60)}"></label>
-      </div>
-      <button class="btn" onclick="startSession()" style="width:100%;margin-top:4px">بدء تسجيل الغياب</button>
-    </div></details>
-    ${recentSessions()}`;
-  }
-  const c=cls(session.classId);
-  const list=S.students.filter(s=>s.classId===session.classId).sort((a,b)=>a.name.localeCompare(b.name,"ar"));
-  const absMap={}; S.absences.filter(a=>a.sessionId===session.id).forEach(a=>absMap[a.studentId]=a);
-  const nAbs=Object.keys(absMap).length;
-  return `${nextSlotBanner()}<div class="card">
-    <div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start;flex-wrap:wrap">
-      <div><h2 style="margin:0">${esc(session.subject)} — ${esc(c?c.name:"")}</h2>
-      <div class="muted">الأستاذ(ة) ${esc(session.teacher)} · ${fmtDate(session.date)} · من ${session.from} إلى ${session.to}</div></div>
-      <div class="row" style="flex:0 0 auto;gap:6px"><button class="btn sm" onclick="openReport('${session.id}')">📄 ورقة الحصة</button><button class="btn ghost sm" onclick="endSession()">إنهاء الحصة</button></div>
-    </div>
-    <label class="f" style="margin:10px 0 0">ملاحظات الحصة<textarea id="sessNotes" style="min-height:52px" placeholder="مثال: تلميذ طُرد من الحصة، تأخر جماعي، حصة تعويض..." onchange="saveNotes('${session.id}',this.value)">${esc((getSess(session.id)||{}).notes||"")}</textarea></label>
-    </div>
+    ${list.length?list.map(x=>{ const cur=now>=hmMin(x.p.from)&&now<hmMin(x.p.to), past=now>=hmMin(x.p.to); const t=slotTeacher(x);
+      const sid=ttSessionId(x), se=getSess(sid), n=S.absences.filter(a=>a.sessionId===sid).length;
+      return `<button class="dslot ${cur?"cur":""} ${past?"past":""}" onclick="startFromSlot('${x.id}')">
+        <span class="dt">${x.p.from}<br>${x.p.to}</span>
+        <span class="dm"><b>${esc(subj(x.subjectId).name)}</b><span>${t?"الأستاذ(ة) "+esc(t.name):"الأستاذ غير محدد"}</span></span>
+        <span class="ds">${cur?'<span class="tag ok">الآن</span> ':""}${se&&se.savedAt?`<span class="tag ok">✓ محفوظ · ${n} غائب</span>`:past?'<span class="tag amb">لم يُسجّل</span>':""}</span>
+      </button>`; }).join(""):`<div class="card empty">لا توجد حصص لهذا القسم اليوم في الجدول.</div>`}`;
+}
+
+/* --- قائمة الحصة: الكل حاضر افتراضياً، تحويل الغائبين ثم الحفظ --- */
+let att=null; // {sid, absent:Set, orig:Set}
+function openAtt(){
+  const ex=S.absences.filter(a=>a.sessionId===session.id).map(a=>a.studentId);
+  att={sid:session.id,absent:new Set(ex),orig:new Set(ex)}; view="att"; flashMsg=null; render(); window.scrollTo(0,0);
+}
+const attDirty=()=>att&&(att.absent.size!==att.orig.size||[...att.absent].some(x=>!att.orig.has(x)));
+function attRoster(){ const se=getSess(session.id)||{}; const ids=(se.roster&&se.roster.length)?se.roster:classStudents(session.classId).map(s=>s.id);
+  const extra=classStudents(session.classId).filter(s=>!ids.includes(s.id)).map(s=>s.id); // تلاميذ أُضيفوا بعد بدء الحصة
+  return [...ids,...extra].map(i=>S.students.find(s=>s.id===i)).filter(Boolean); }
+function vAtt(){
+  if(!session){ view="session"; return vHome(); }
+  if(!att||att.sid!==session.id) { const ex=S.absences.filter(a=>a.sessionId===session.id).map(a=>a.studentId); att={sid:session.id,absent:new Set(ex),orig:new Set(ex)}; }
+  const c=cls(session.classId), list=attRoster(), se=getSess(session.id)||{};
+  const nA=list.filter(s=>att.absent.has(s.id)).length;
+  const sentSet=new Set(S.absences.filter(a=>a.sessionId===session.id&&(a.status==="sent"||a.status==="sending")).map(a=>a.studentId));
+  return `<div class="card atthead">
+      <div class="tbar"><button class="btn ghost sm" onclick="leaveAtt()">→ رجوع</button>
+      <div style="flex:1"><h2 style="margin:0">${esc(session.subject)}</h2><div>الأستاذ(ة) <b>${esc(session.teacher)}</b> · ${esc(c?c.name:"")}</div>
+      <div class="muted">${DAY_NAMES[new Date(session.date+"T12:00:00").getDay()]} ${fmtDate(session.date)} · من ${session.from} إلى ${session.to}</div></div>
+      <button class="btn ghost sm" onclick="openReport('${session.id}')">📄 ورقة الحصة</button></div></div>
     <div class="stats">
       <div class="stat"><b>${list.length}</b><span>عدد التلاميذ</span></div>
-      <div class="stat"><b style="color:var(--brand)">${list.length-nAbs}</b><span>حاضر</span></div>
-      <div class="stat"><b style="color:var(--red)">${nAbs}</b><span>غائب</span></div>
+      <div class="stat"><b style="color:var(--brand)">${list.length-nA}</b><span>حاضر</span></div>
+      <div class="stat"><b style="color:var(--red)">${nA}</b><span>غائب</span></div>
     </div>
     <div class="scan">
       <span>🔎</span>
-      <input id="scanInput" inputmode="numeric" placeholder="امسح الكودبار أو اكتب رقم التلميذ" onkeydown="if(event.key==='Enter'){scanCode(this.value);this.value=''}">
+      <input id="scanInput" inputmode="numeric" placeholder="امسح الكودبار لتسجيل الغائب" onkeydown="if(event.key==='Enter'){attScan(this.value);this.value=''}">
       <label class="btn ghost sm" style="flex:0 0 auto">📷 صورة<input type="file" accept="image/*" capture="environment" class="hide" onchange="scanImage(this)"></label>
     </div>
     ${flashHTML()}
-    <p class="muted" style="margin:0 0 8px">اضغط على اسم التلميذ الغائب لتسجيل غيابه، أو اضغط مرة أخرى لإلغائه (قبل إرسال الإشعار).</p>
-    ${list.length?`<div class="grid">${list.map(s=>{const a=absMap[s.id];const sent=a&&a.status==="sent";
-      return `<button class="stu ${a?"abs":""} ${sent?"locked":""}" onclick="toggleAbs('${s.id}')">
-        <span class="n">${esc(s.name)}</span><span class="c">${esc(s.code)}</span>
-        ${a?`<span class="tag ${sent?"ok":"red"}">${sent?"غائب · أُعلم الولي":"غائب"}</span>`:""}
-      </button>`}).join("")}</div>`:`<div class="empty">لا يوجد تلاميذ في هذا القسم.</div>`}`;
+    <p class="muted" style="margin:0 0 8px">كل التلاميذ «حاضر». اضغط على التلميذ الغائب فقط لتحويله إلى «غائب»، ثم اضغط «حفظ».</p>
+    <div class="roster">${list.map((s,i)=>{ const ab=att.absent.has(s.id), lk=sentSet.has(s.id);
+      return `<button class="rrow ${ab?"abs":""}" onclick="attToggle('${s.id}')" ${lk?"disabled":""}><span class="rn">${i+1}</span><span class="rname">${esc(s.name)}</span>
+        <span class="rst">${ab?"غائب":"حاضر"}${lk?" · أُعلم الولي":""}</span></button>`; }).join("")}</div>
+    <label class="f" style="margin-top:12px">ملاحظات الحصة<textarea id="sessNotes" style="min-height:52px" placeholder="مثال: تلميذ التحق متأخراً، طرد من الحصة...">${esc(se.notes||"")}</textarea></label>
+    <div class="savebar"><span>${attDirty()?'<span class="tag amb">تغييرات غير محفوظة</span>':se.savedAt?`<span class="tag ok">✓ محفوظ ${new Date(se.savedAt).toLocaleTimeString("ar-DZ",{hour:"2-digit",minute:"2-digit"})}</span>`:'<span class="tag amb">لم يُحفظ بعد</span>'}</span>
+      <button class="btn big" style="width:auto;margin:0" onclick="saveAttendance()">💾 حفظ (${nA} غائب)</button></div>`;
+}
+function attToggle(id){ att.absent.has(id)?att.absent.delete(id):att.absent.add(id); render(); }
+function attScan(v){
+  v=String(v||"").replace(/\*/g,"").trim(); if(!v) return;
+  const st=stuByCode(v); if(!st) return toast("الرقم "+v+" غير موجود",true);
+  if(st.classId!==session.classId) return toast(st.name+" ليس من هذا القسم",true);
+  att.absent.add(st.id); toast("✓ "+st.name+" غائب");
+}
+function leaveAtt(){
+  const back=session&&session.slotId?"day":"session";
+  if(attDirty()) return askBox("لم تحفظ الغيابات","هل تريد الحفظ قبل الخروج؟","حفظ",()=>{ saveAttendance(true); view=back; render(); },"خروج بدون حفظ",()=>{ att=null; view=back; render(); });
+  view=back; render();
+}
+function saveAttendance(silent){
+  const se=getSess(session.id); const now=Date.now(); const c=cls(session.classId);
+  const notesEl=document.getElementById("sessNotes"); if(se&&notesEl) se.notes=notesEl.value;
+  const existing=S.absences.filter(a=>a.sessionId===session.id);
+  let kept=0;
+  existing.forEach(a=>{ if(!att.absent.has(a.studentId)){ if(a.status==="sent"||a.status==="sending") { att.absent.add(a.studentId); kept++; } else S.absences=S.absences.filter(x=>x.id!==a.id); } });
+  const manual=S.cfg.sendMode==="manual";
+  att.absent.forEach(sid=>{
+    if(existing.some(a=>a.studentId===sid)) return;
+    const st=S.students.find(s=>s.id===sid); if(!st) return;
+    S.absences.push({id:session.id+"_"+sid,sessionId:session.id,studentId:sid,studentName:st.name,code:st.code,classId:session.classId,className:c?c.name:"",
+      subject:session.subject,teacher:session.teacher,date:session.date,from:session.from,to:session.to,createdAt:now,
+      notifyAt:now+(Number(S.cfg.delayMin)||0)*60000,status:manual?"hold":"waiting",attempts:0});
+  });
+  if(se) se.savedAt=now;
+  att.orig=new Set(att.absent); saveLocal();
+  if(silent) return;
+  // بعد الحفظ: اقتراح القسم التالي في نفس الفترة
+  const nx=nextInRound(session);
+  document.getElementById("modal").innerHTML=`<div class="overlay" onclick="if(event.target===this)closeModal()"><div class="dialog" style="text-align:center">
+    <div style="font-size:40px">✅</div><h2 style="margin:4px 0">حُفظ ${esc(c?c.name:"")}</h2>
+    <p>${att.absent.size} غائب · ${attRoster().length-att.absent.size} حاضر${kept?`<br><span class="muted">${kept} غياب أُعلم وليّه مسبقاً فبقي مسجلاً.</span>`:""}<br>
+    <span class="muted">${manual?"الرسائل تنتظر الضغط على «إرسال الرسائل للأولياء».":"تُرسل الرسائل آلياً بعد "+S.cfg.delayMin+" دقيقة."}</span></p>
+    ${nx?`<button class="btn big" onclick="closeModal();startFromSlot('${nx.id}')">التالي: ${esc(cls(nx.classId).name)} — ${esc(subj(nx.subjectId).name)} ←</button>`:`<p class="tag ok" style="display:inline-block">انتهت كل أقسام هذه الفترة 👍</p>`}
+    <div class="row" style="margin-top:8px"><button class="btn ghost" onclick="closeModal();roundPid=null;view='round';render()">دورة الفترة</button><button class="btn ghost" onclick="closeModal();render()">بقاء هنا</button></div></div></div>`;
+  render();
+}
+function askBox(title,msg,okTxt,okFn,altTxt,altFn){
+  document.getElementById("modal").innerHTML=`<div class="overlay"><div class="dialog"><h2 style="margin-top:0">${title}</h2>${msg?`<p>${msg}</p>`:""}
+    <div class="row"><button class="btn" id="abOk">${okTxt}</button><button class="btn ghost" id="abAlt">${altTxt}</button><button class="btn ghost" onclick="closeModal()">إلغاء</button></div></div></div>`;
+  document.getElementById("abOk").onclick=()=>{ closeModal(); okFn(); };
+  document.getElementById("abAlt").onclick=()=>{ closeModal(); altFn(); };
+}
+
+/* --- دورة الفترة: كل الأقسام التي عندها حصة في نفس الفترة --- */
+let roundPid=null;
+function currentPid(){ const now=hmMin(nowHM()); const ps=sortedPeriods(); const p=ps.find(p=>now>=hmMin(p.from)-10&&now<hmMin(p.to)); return p?p.id:null; }
+function roundSlots(pid){ const d=new Date().getDay(); return S.timetable.filter(x=>x.day===d&&x.periodId===pid&&cls(x.classId)&&subj(x.subjectId)).sort((a,b)=>cls(a.classId).name.localeCompare(cls(b.classId).name,"ar",{numeric:true})); }
+function nextInRound(se){
+  if(!se.slotId) return null; const sl=S.timetable.find(x=>x.id===se.slotId); if(!sl) return null;
+  return roundSlots(sl.periodId).find(x=>{ const s2=getSess(ttSessionId(x)); return !(s2&&s2.savedAt)&&ttSessionId(x)!==se.id; })||null;
+}
+function roundSummary(){
+  const pid=currentPid(); if(!pid) return "";
+  const sl=roundSlots(pid); if(!sl.length) return "";
+  const done=sl.filter(x=>{const s2=getSess(ttSessionId(x)); return s2&&s2.savedAt;}).length; const p=period(pid);
+  return `<div class="card roundcard" onclick="roundPid=null;view='round';render()"><div><b>⏱️ الفترة الحالية ${p.from}–${p.to}</b><div class="muted">${done} من ${sl.length} قسم سُجّل</div></div>
+    <div class="prog"><i style="width:${Math.round(done*100/sl.length)}%"></i></div><span class="btn sm">دورة الفترة ←</span></div>`;
+}
+function vRound(){
+  const ps=sortedPeriods(); const pid=roundPid||currentPid()||(ps[0]&&ps[0].id); const p=period(pid);
+  const sl=pid?roundSlots(pid):[]; const d=new Date().getDay();
+  const ids=sl.map(ttSessionId);
+  const abs=S.absences.filter(a=>ids.includes(a.sessionId));
+  const held=abs.filter(a=>a.status==="hold");
+  const done=sl.filter(x=>{const s2=getSess(ttSessionId(x)); return s2&&s2.savedAt;}).length;
+  return `<div class="card"><h2>دورة الفترة — ${DAY_NAMES[d]} ${fmtDate(todayStr())}</h2>
+    <div class="segs">${ps.map(x=>`<button class="${x.id===pid?"on":""}" onclick="roundPid='${x.id}';render()">${x.from}–${x.to}${x.id===currentPid()?" ●":""}</button>`).join("")}</div>
+    ${p?`<div class="prog" style="margin-top:10px"><i style="width:${sl.length?Math.round(done*100/sl.length):0}%"></i></div><p class="muted" style="margin:6px 0 0">${done} من ${sl.length} قسم سُجّل · ${abs.length} غائب في هذه الفترة</p>`:""}</div>
+    ${flashHTML()}
+    ${sl.length?sl.map(x=>{ const sid=ttSessionId(x), se=getSess(sid), n=S.absences.filter(a=>a.sessionId===sid).length, t=slotTeacher(x);
+      return `<button class="dslot ${se&&se.savedAt?"done":""}" onclick="homeClass='${x.classId}';homeLevel=cls('${x.classId}').level;startFromSlot('${x.id}')">
+        <span class="dt">${se&&se.savedAt?"✅":"⏳"}</span>
+        <span class="dm"><b>${esc(cls(x.classId).name)}</b><span>${esc(subj(x.subjectId).name)} · ${t?esc(t.name):"—"}</span></span>
+        <span class="ds">${se&&se.savedAt?`<span class="tag ${n?"red":"ok"}">${n} غائب</span>`:'<span class="tag amb">لم يُسجّل</span>'}</span></button>`; }).join("")
+      :`<div class="card empty">لا توجد حصص في هذه الفترة اليوم حسب الجدول.</div>`}
+    <div class="card"><h2>إرسال الرسائل للأولياء</h2>
+      ${held.length?`<p>${held.length} رسالة جاهزة بانتظار الإرسال: ${held.map(a=>esc(a.studentName)).join("، ")}</p>
+        <button class="btn big" onclick="releaseHeld(a=>${JSON.stringify(ids).replace(/"/g,"&quot;")}.includes(a.sessionId))">📨 إرسال الرسائل للأولياء (${held.length})</button>`
+      :`<p class="muted" style="margin:0">${S.cfg.sendMode==="manual"?"لا توجد رسائل بانتظار الإرسال في هذه الفترة.":"الإرسال آلي: تُرسل الرسائل وحدها بعد الحفظ ومرور "+S.cfg.delayMin+" دقيقة. المتابعة في «الإشعارات»."}</p>`}
+    </div>`;
+}
+function releaseHeld(pred){
+  const now=Date.now(); let n=0;
+  S.absences.forEach(a=>{ if(a.status==="hold"&&pred(a)){ a.status="waiting"; a.notifyAt=now; n++; } });
+  saveLocal(); toast(autoOn()?`📨 بدأ إرسال ${n} رسالة من شريحة الجهاز`:`${n} رسالة جاهزة — أرسلها من «الإشعارات»`); autoSendTick().catch(()=>{});
 }
 function recentSessions(){
   const seen={}; const rows=[];
@@ -441,8 +627,7 @@ function startSession(){
   const g=id=>document.getElementById(id).value.trim();
   if(!g("sSubject")||!g("sTeacher")) return toast("أدخل المادة واسم الأستاذ",true);
   session={id:uid(),classId:g("sClass"),subject:g("sSubject"),teacher:g("sTeacher"),date:g("sDate"),from:g("sFrom"),to:g("sTo")};
-  ensureSession(session); lsSet("ghiyab_session",session); flashMsg=null; render();
-  setTimeout(()=>{const s=document.getElementById("scanInput"); if(s) s.focus()},50);
+  ensureSession(session); lsSet("ghiyab_session",session); openAtt();
 }
 function endSession(){ session=null; lsSet("ghiyab_session",null); flashMsg=null; render(); }
 function toggleAbs(studentId){
@@ -472,7 +657,7 @@ async function scanImage(inp){
     const det=new BarcodeDetector({formats:["code_39","code_128","qr_code"]});
     const r=await det.detect(bmp);
     if(!r.length) return toast("لم يُعثر على كودبار في الصورة",true);
-    r.forEach(x=>scanCode(x.rawValue));
+    r.forEach(x=>view==="att"?attScan(x.rawValue):scanCode(x.rawValue));
   }catch(e){ toast("تعذّرت قراءة الصورة",true) }
 }
 
@@ -483,6 +668,7 @@ function vNotifs(){
   const act=needAction().filter(a=>a.date===notifDate);
   const wait=all.filter(a=>(a.status==="waiting"||a.status==="sending")&&!act.includes(a));
   const sent=all.filter(a=>a.status==="sent");
+  const held=all.filter(a=>a.status==="hold");
   const card=(a,kind)=>{
     const st=S.students.find(s=>s.id===a.studentId)||{};
     const phone=intlPhone(st.phone); const msg=message(a);
@@ -519,6 +705,8 @@ function vNotifs(){
     </div>
     ${flashHTML()}
     ${!all.length?`<div class="card empty">لا توجد غيابات مسجّلة في هذا اليوم.</div>`:""}
+    ${held.length?`<div class="card" style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><div><b>${held.length}</b> رسالة بانتظار الإرسال اليدوي<div class="muted">${held.map(a=>esc(a.studentName)).slice(0,8).join("، ")}${held.length>8?"…":""}</div></div>
+      <button class="btn" onclick="releaseHeld(a=>a.date==='${notifDate}')">📨 إرسال الرسائل للأولياء (${held.length})</button></div>`:""}
     ${act.length?`<h3 style="margin:6px 2px">يحتاج إجراء</h3>${act.map(a=>card(a,"act")).join("")}`:""}
     ${wait.length?`<h3 style="margin:6px 2px">في الانتظار</h3>${wait.map(a=>card(a,"wait")).join("")}`:""}
     ${sent.length?`<h3 style="margin:6px 2px">أُرسلت</h3>${sent.map(a=>card(a,"sent")).join("")}`:""}`;
@@ -559,7 +747,7 @@ document.addEventListener("visibilitychange",()=>{ if(!document.hidden) autoSend
 function vStudents(){
   if(selClass&&!cls(selClass)) selClass=null;
   const c=selClass?cls(selClass):null;
-  const list=c?S.students.filter(s=>s.classId===c.id).sort((a,b)=>a.name.localeCompare(b.name,"ar")):[];
+  const list=c?classStudents(c.id):[];
   return `<div class="card"><h2>الأقسام</h2>
     ${S.classes.length?`<div class="row" style="margin-bottom:10px">${S.classes.slice().sort((a,b)=>a.name.localeCompare(b.name,"ar")).map(k=>`<button class="btn ${k.id===selClass?"":"ghost"} sm" style="flex:0 0 auto" onclick="pickClass('${k.id}')">${esc(k.name)} <span style="opacity:.7">(${S.students.filter(s=>s.classId===k.id).length})</span></button>`).join("")}</div>`:`<p class="muted">لا توجد أقسام بعد.</p>`}
     <div class="row" style="align-items:end">
@@ -583,8 +771,8 @@ function vStudents(){
       <textarea id="bulk" placeholder="عبد الله سلطان، سلطان رشيد، 0550123456"></textarea>
       <button class="btn ghost" onclick="bulkAdd()">إضافة القائمة</button>
     </details>
-    ${list.length?`<table style="margin-top:10px"><tr><th>الرقم</th><th>الاسم</th><th>الولي</th><th>الهاتف</th><th></th></tr>
-      ${list.map(s=>`<tr><td class="ltr" style="text-align:start">${esc(s.code)}</td><td>${esc(s.name)}</td><td>${esc(s.parent||"")}</td><td class="ltr">${esc(s.phone||"")} ${opTag(operatorOf(s.phone))}</td>
+    ${list.length?`<p class="muted" style="margin:10px 0 0">الترتيب هنا هو ترتيب القائمة الرسمية، ويظهر به التلاميذ في تسجيل الغياب. استعمل ▲▼ لتعديله.</p><table style="margin-top:6px"><tr><th>#</th><th>الرقم</th><th>الاسم</th><th>الولي</th><th>الهاتف</th><th></th></tr>
+      ${list.map((s,i)=>`<tr><td><span class="muted">${i+1}</span> <button class="mv" onclick="moveStudent('${s.id}',-1)">▲</button><button class="mv" onclick="moveStudent('${s.id}',1)">▼</button></td><td class="ltr" style="text-align:start">${esc(s.code)}</td><td>${esc(s.name)}</td><td>${esc(s.parent||"")}</td><td class="ltr">${esc(s.phone||"")} ${opTag(operatorOf(s.phone))}</td>
       <td style="white-space:nowrap"><button class="btn ghost sm" onclick="editStudent('${s.id}')">تعديل</button></td></tr>`).join("")}</table>`:`<div class="empty">أضف تلاميذ هذا القسم. يتولد رقم وكودبار كل تلميذ تلقائياً.</div>`}
   </div>`:(S.classes.length?`<div class="card empty">اختر قسماً لعرض تلاميذه.</div>`:"")}`;
 }
@@ -644,7 +832,7 @@ function closeModal(){ document.getElementById("modal").innerHTML=""; }
 function vLabels(){
   if(!S.classes.length) return emptyData();
   if(!labelClass||!cls(labelClass)) labelClass=S.classes[0].id;
-  const list=S.students.filter(s=>s.classId===labelClass).sort((a,b)=>a.name.localeCompare(b.name,"ar"));
+  const list=classStudents(labelClass);
   const c=cls(labelClass);
   return `<div class="card noprint"><h2>ملصقات الكودبار</h2>
     <p class="muted" style="margin-top:0">يتولد لكل تلميذ رقم وكودبار (Code 39) تلقائياً. تُلصق في دفتر المراسلة أو الكراس اليومي، ويُمسح بأي قارئ كودبار أو بكاميرا الهاتف.</p>
@@ -726,6 +914,9 @@ function setMsg(){
       <label class="f">إرسال الرسالة بعد تسجيل الغياب بـ (دقيقة)<input id="cDelay" type="number" min="0" value="${esc(c.delayMin)}"></label>
       <label class="f">رمز الدولة للهاتف<input id="cCc" value="${esc(c.cc)}" style="direction:ltr"></label>
     </div>
+    <div class="f">طريقة إرسال الرسائل للأولياء</div>
+    <label class="switch" style="font-weight:400"><input type="radio" name="sm" ${c.sendMode!=="manual"?"checked":""} onchange="saveCfg({...S.cfg,sendMode:'auto'})"> <span><b>آلياً:</b> تُرسل بعد حفظ القسم ومرور المهلة، بدون تدخل.</span></label>
+    <label class="switch" style="font-weight:400"><input type="radio" name="sm" ${c.sendMode==="manual"?"checked":""} onchange="saveCfg({...S.cfg,sendMode:'manual'})"> <span><b>يدوياً:</b> لا يُرسل شيء حتى يضغط المكلّف «إرسال الرسائل للأولياء» بعد مراجعة القائمة.</span></label>
     <div class="row">
       <label class="f">لا تُرسل الرسائل قبل الساعة<input id="cWFrom" type="time" value="${esc(w.from||"")}"></label>
       <label class="f">ولا بعد الساعة<input id="cWTo" type="time" value="${esc(w.to||"")}"></label>
@@ -907,7 +1098,7 @@ function sessionData(id){
   const rosterIds=(se.roster&&se.roster.length)?se.roster:S.students.filter(s=>s.classId===se.classId).map(s=>s.id);
   const ids=new Set([...rosterIds,...absIds]);
   const studs=[...ids].map(i=>S.students.find(s=>s.id===i)||(()=>{const a=abs.find(x=>x.studentId===i);return a?{id:i,name:a.studentName,code:a.code}:null})()).filter(Boolean)
-    .sort((a,b)=>a.name.localeCompare(b.name,"ar"));
+    ;
   return {se,abs,present:studs.filter(s=>!absIds.has(s.id)),absent:studs.filter(s=>absIds.has(s.id)).map(s=>({...s,a:abs.find(x=>x.studentId===s.id)})),total:studs.length};
 }
 let sessDate=todayStr(), sessClass="";
@@ -929,7 +1120,7 @@ function resumeSession(id){
   const x=allSessions().find(z=>z.id===id); if(!x) return;
   session={id:x.id,slotId:x.slotId,classId:x.classId,subject:x.subject,teacher:x.teacher,date:x.date,from:x.from,to:x.to};
   if(x.legacy) ensureSession(session);
-  lsSet("ghiyab_session",session); view="session"; render();
+  lsSet("ghiyab_session",session); openAtt();
 }
 let reportId=null, reportBack="sessions", zoom=0; // 0 = ملاءمة الشاشة
 function openReport(id){ reportBack=view; reportId=id; zoom=0; view="report"; flashMsg=null; render(); window.scrollTo(0,0); }
@@ -1020,8 +1211,7 @@ function startFromSlot(slotId){
   const x=S.timetable.find(z=>z.id===slotId); if(!x) return;
   const p=period(x.periodId), t=slotTeacher(x);
   session={id:ttSessionId(x),slotId:x.id,classId:x.classId,subject:subj(x.subjectId).name,teacher:t?t.name:"—",date:todayStr(),from:p.from,to:p.to};
-  ensureSession(session); lsSet("ghiyab_session",session); flashMsg=null; render();
-  setTimeout(()=>{const s=document.getElementById("scanInput"); if(s) s.focus()},50);
+  ensureSession(session); lsSet("ghiyab_session",session); openAtt();
 }
 // أثناء الحصة: عند انتهاء وقتها يقترح الحصة التالية لنفس القسم حسب الجدول
 function nextSlotBanner(){
@@ -1148,22 +1338,30 @@ function delPeriod(id){
 
 /* --- Demo data --- */
 async function seedDemo(){
-  const id=uid(); const yy=String(new Date().getFullYear()).slice(2);
-  const names=["عبد الله سلطان","سلمى محمدي","أمين بن علي","ياسمين قاسمي","محمد الأمين زروقي","إيمان بوزيد","يوسف حمادي","رانية بلقاسم","أيوب مرابط","هاجر سعيدي","إسحاق بن يحيى","مريم عيساوي","وليد شريف","نور الهدى خالدي","أنس بوعزة","آية فرحات","رياض منصوري","خديجة بن سالم","زكرياء حداد","سارة لعمامري","إلياس بوشامة","شيماء قويدر","عماد طالبي","لينة بن عمر","حمزة رحماني"];
-  const cl={id,level:"2 ثانوي",name:"2 ثانوي — علوم تجريبية 1"};
-  const base=parseInt(nextCode().slice(2),10);
-  const studs=names.map((n,i)=>({id:uid(),code:yy+String(base+i).padStart(4,"0"),name:n,parent:"ولي "+n.split(" ").slice(-1)[0],phone:"",classId:id}));
-  // أساتذة وجدول توقيت تجريبي
+  const yy=String(new Date().getFullYear()).slice(2);
+  const first=["عبد الله","سلمى","أمين","ياسمين","محمد الأمين","إيمان","يوسف","رانية","أيوب","هاجر","إسحاق","مريم","وليد","نور الهدى","أنس","آية","رياض","خديجة","زكرياء","سارة","إلياس","شيماء","عماد","لينة","حمزة","أسماء","بلال","دعاء"];
+  const last=["سلطان","محمدي","بن علي","قاسمي","زروقي","بوزيد","حمادي","بلقاسم","مرابط","سعيدي","بن يحيى","عيساوي","شريف","خالدي","بوعزة","فرحات","منصوري","بن سالم","حداد","لعمامري","بوشامة","قويدر","طالبي","بن عمر","رحماني","عثماني","مزياني","بوخالفة"];
   const sid=n=>(S.subjects.find(x=>x.name===n)||{}).id;
-  const tnames=[["محمد بوعلام","الرياضيات"],["فاطمة الزهراء بن عيسى","اللغة العربية"],["كريم سعدي","العلوم الفيزيائية"],["نادية حمدي","العلوم الطبيعية"],["سمير بلعيد","اللغة الفرنسية"],["ليلى مسعودي","اللغة الإنجليزية"],["عبد القادر زيتوني","التاريخ والجغرافيا"],["رشيد عمراني","التربية الإسلامية"]];
+  const tnames=[["محمد بوعلام","الرياضيات"],["فاطمة الزهراء بن عيسى","اللغة العربية"],["كريم سعدي","العلوم الفيزيائية"],["نادية حمدي","العلوم الطبيعية"],["سمير بلعيد","اللغة الفرنسية"],["ليلى مسعودي","اللغة الإنجليزية"],["عبد القادر زيتوني","التاريخ والجغرافيا"],["رشيد عمراني","التربية الإسلامية"],["حسان قرفي","الرياضيات"],["وهيبة لعرابي","اللغة العربية"]];
   const tch=tnames.filter(t=>sid(t[1])).map(([n,sb])=>({id:uid(),name:n,subjectId:sid(sb)}));
-  cl.assign={}; tch.forEach(t=>cl.assign[t.subjectId]=t.id);
+  S.teachers.push(...tch);
   const plan=["الرياضيات","العلوم الفيزيائية","اللغة العربية","العلوم الطبيعية","اللغة الفرنسية","الرياضيات","اللغة الإنجليزية","التاريخ والجغرافيا","التربية الإسلامية"];
-  const tt=[]; let k=0;
-  schoolDays().forEach(d=>sortedPeriods().forEach(p=>{ const s=sid(plan[k++%plan.length]); if(s) tt.push({id:uid(),classId:id,day:d,periodId:p.id,subjectId:s}); }));
-  S.teachers.push(...tch); S.timetable.push(...tt);
-  S.classes.push(cl); S.students.push(...studs); saveLocal();
-  selClass=id; lsSet("ghiyab_selClass",id); toast("أُضيف قسم تجريبي بـ 25 تلميذاً وأساتذته وجدول توقيته");
+  const defs=[["1 ثانوي","1 ثانوي — قسم 1"],["2 ثانوي","2 ثانوي — علوم تجريبية 1"],["3 ثانوي","3 ثانوي — قسم 2"],["3 ثانوي","3 ثانوي — قسم 3"]];
+  let base=parseInt(nextCode().slice(2),10), firstId=null;
+  defs.forEach(([lv,name],ci)=>{
+    const id=uid(); firstId=firstId||id;
+    const cl={id,level:lv,name,assign:{}};
+    // أستاذ لكل مادة (يتناوب الأستاذان في الرياضيات والعربية)
+    S.subjects.forEach(sb=>{ const own=tch.filter(t=>t.subjectId===sb.id); if(own.length) cl.assign[sb.id]=own[ci%own.length].id; });
+    const n=22+ci*2;
+    for(let i=0;i<n;i++){ const nm=first[(i*7+ci*3)%first.length]+" "+last[(i*5+ci)%last.length];
+      S.students.push({id:uid(),code:yy+String(base++).padStart(4,"0"),name:nm,parent:"ولي "+nm.split(" ").slice(-1)[0],phone:"",classId:id}); }
+    let k=ci*2;
+    schoolDays().forEach(d=>sortedPeriods().forEach(p=>{ const s=sid(plan[k++%plan.length]); if(s) S.timetable.push({id:uid(),classId:id,day:d,periodId:p.id,subjectId:s}); }));
+    S.classes.push(cl);
+  });
+  saveLocal();
+  selClass=firstId; lsSet("ghiyab_selClass",firstId); toast("أُضيفت 4 أقسام تجريبية بتلاميذها وأساتذتها وجداول توقيتها");
 }
 
 /* ============ Boot ============ */
