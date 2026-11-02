@@ -408,7 +408,7 @@ function render(){
   const m=document.getElementById("main");
   const active=document.activeElement&&document.activeElement.id;
   setTimeout(()=>{ if(view==="settings"&&setTab==="msg") smsCount(); },0);
-  if(S.cfg.pin&&PROTECTED.includes(view)&&Date.now()>unlockUntil){ m.innerHTML=pinScreen(); setTimeout(()=>{const x=document.getElementById("pinIn"); x&&x.focus()},30); return; }
+  if(S.cfg.pin&&(PROTECTED.includes(view)||(view==="att"&&session&&session.date<todayStr()))&&Date.now()>unlockUntil){ m.innerHTML=pinScreen(); setTimeout(()=>{const x=document.getElementById("pinIn"); x&&x.focus()},30); return; }
   m.innerHTML=({reports:vReports,letter:vLetter,session:vHome,round:vRound,week:vWeek,day:vDay,att:vAtt,sessions:vSessions,report:vReport,notifs:vNotifs,students:vStudents,timetable:vTimetable,staff:vStaff,labels:vLabels,settings:vSettings}[view]||vSession)();
   if(["reports","letter"].includes(view)) setTimeout(fitSheets,0);
   if(active==="scanInput"){ const s=document.getElementById("scanInput"); if(s) s.focus(); }
@@ -522,6 +522,9 @@ function vAtt(){
       <div style="flex:1"><h2 style="margin:0">${esc(session.subject)}</h2><div>الأستاذ(ة) <b>${esc(session.teacher)}</b> · ${esc(c?c.name:"")}</div>
       <div class="muted">${DAY_NAMES[new Date(session.date+"T12:00:00").getDay()]} ${fmtDate(session.date)} · من ${session.from} إلى ${session.to}</div></div>
       <button class="btn ghost sm" onclick="openReport('${session.id}')">📄 ورقة الحصة</button></div></div>
+    ${session.date<todayStr()?`<div class="banner amb">⚠️ أنت تعدّل حصة سابقة (${DAY_NAMES[new Date(session.date+"T12:00:00").getDay()]} ${fmtDate(session.date)}).
+      <label class="switch" style="margin:6px 0 0;font-weight:400"><input type="checkbox" ${att.notifyPast?"checked":""} onchange="att.notifyPast=this.checked"> إرسال رسائل للأولياء عن الغيابات المضافة الآن</label></div>`:""}
+    ${se.edits&&se.edits.length?`<p class="muted" style="margin:0 0 8px">عُدّلت ${se.edits.length} مرة بعد الحفظ الأول — آخر تعديل ${new Date(se.edits[se.edits.length-1].at).toLocaleString("ar-DZ")}</p>`:""}
     <div class="stats">
       <div class="stat"><b>${list.length}</b><span>عدد التلاميذ</span></div>
       <div class="stat"><b style="color:var(--brand)">${list.length-nA}</b><span>حاضر</span></div>
@@ -535,13 +538,34 @@ function vAtt(){
     ${flashHTML()}
     <p class="muted" style="margin:0 0 8px">كل التلاميذ «حاضر». اضغط على التلميذ الغائب فقط لتحويله إلى «غائب»، ثم اضغط «حفظ».</p>
     <div class="roster">${list.map((s,i)=>{ const ab=att.absent.has(s.id), lk=sentSet.has(s.id);
-      return `<button class="rrow ${ab?"abs":""}" onclick="attToggle('${s.id}')" ${lk?"disabled":""}><span class="rn">${i+1}</span><span class="rname">${esc(s.name)}</span>
+      return `<button class="rrow ${ab?"abs":""}" onclick="attToggle('${s.id}')"><span class="rn">${i+1}</span><span class="rname">${esc(s.name)}</span>
         <span class="rst">${ab?"غائب":"حاضر"}${lk?" · أُعلم الولي":""}</span></button>`; }).join("")}</div>
     <label class="f" style="margin-top:12px">ملاحظات الحصة<textarea id="sessNotes" style="min-height:52px" placeholder="مثال: تلميذ التحق متأخراً، طرد من الحصة...">${esc(se.notes||"")}</textarea></label>
     <div class="savebar"><span>${attDirty()?'<span class="tag amb">تغييرات غير محفوظة</span>':se.savedAt?`<span class="tag ok">✓ محفوظ ${new Date(se.savedAt).toLocaleTimeString("ar-DZ",{hour:"2-digit",minute:"2-digit"})}</span>`:'<span class="tag amb">لم يُحفظ بعد</span>'}</span>
       <button class="btn big" style="width:auto;margin:0" onclick="saveAttendance()">💾 حفظ (${nA} غائب)</button></div>`;
 }
-function attToggle(id){ att.absent.has(id)?att.absent.delete(id):att.absent.add(id); render(); }
+function attToggle(id){
+  const a=S.absences.find(x=>x.sessionId===session.id&&x.studentId===id&&(x.status==="sent"||x.status==="sending"));
+  if(a&&att.absent.has(id)) return correctSent(a);
+  att.absent.has(id)?att.absent.delete(id):att.absent.add(id); render();
+}
+// تصحيح غياب سُجّل خطأً وأُعلم الولي به
+function correctSent(a){
+  const st=S.students.find(s=>s.id===a.studentId)||{};
+  const msg=`${S.cfg.school}: نعتذر، التلميذ(ة) ${a.studentName} كان حاضراً في حصة ${a.subject} يوم ${fmtDate(a.date)}. رسالة الغياب السابقة أُرسلت خطأً.`;
+  askBox(`تصحيح غياب ${esc(a.studentName)}`,`أُرسلت للولي رسالة غياب. إذا كان التلميذ حاضراً فعلاً يُحذف الغياب، ويمكن إرسال رسالة تصحيح للولي:<br><span class="muted">«${esc(msg)}»</span>`,
+    "تصحيح + رسالة اعتذار",()=>doCorrect(a,msg),"تصحيح بدون رسالة",()=>doCorrect(a,null));
+}
+async function doCorrect(a,msg){
+  S.absences=S.absences.filter(x=>x.id!==a.id); att.absent.delete(a.studentId); att.orig.delete(a.studentId);
+  const se=getSess(a.sessionId); if(se){ (se.edits=se.edits||[]).push({at:Date.now(),what:"تصحيح غياب "+a.studentName+(msg?" مع رسالة اعتذار":"")}); }
+  saveLocal(); render();
+  if(msg){ const st=S.students.find(s=>s.id===a.studentId)||{}; const ph=intlPhone(st.phone); const pl=smsPlugin();
+    if(!ph) return toast("لا يوجد رقم للولي",true);
+    if(IS_APP&&pl){ try{ const sim=pickSim(st.phone); await pl.send({phone:"+"+ph,message:msg,...(sim!=null?{subscriptionId:sim}:{})}); toast("✓ صُحّح الغياب وأُرسلت رسالة الاعتذار"); }catch(e){ toast("صُحّح الغياب، لكن فشل إرسال الرسالة: "+((e&&e.message)||e),true); } }
+    else location.href=`sms:+${ph}?body=${encodeURIComponent(msg)}`;
+  } else toast("✓ صُحّح الغياب");
+}
 function attScan(v){
   v=String(v||"").replace(/\*/g,"").trim(); if(!v) return;
   const st=stuByCode(v); if(!st) return toast("الرقم "+v+" غير موجود",true);
@@ -549,7 +573,7 @@ function attScan(v){
   att.absent.add(st.id); toast("✓ "+st.name+" غائب");
 }
 function leaveAtt(){
-  const back=session&&session.slotId?"day":"session";
+  const back=session&&session.date<todayStr()?"sessions":session&&session.slotId?"day":"session";
   if(attDirty()) return askBox("لم تحفظ الغيابات","هل تريد الحفظ قبل الخروج؟","حفظ",()=>{ saveAttendance(true); view=back; render(); },"خروج بدون حفظ",()=>{ att=null; view=back; render(); });
   view=back; render();
 }
@@ -559,13 +583,14 @@ function saveAttendance(silent){
   const existing=S.absences.filter(a=>a.sessionId===session.id);
   let kept=0;
   existing.forEach(a=>{ if(!att.absent.has(a.studentId)){ if(a.status==="sent"||a.status==="sending") { att.absent.add(a.studentId); kept++; } else S.absences=S.absences.filter(x=>x.id!==a.id); } });
-  const manual=S.cfg.sendMode==="manual";
+  const manual=S.cfg.sendMode==="manual", past=session.date<todayStr();
+  if(se&&se.savedAt&&attDirty()) (se.edits=se.edits||[]).push({at:now,what:"تعديل الغيابات"});
   att.absent.forEach(sid=>{
     if(existing.some(a=>a.studentId===sid)) return;
     const st=S.students.find(s=>s.id===sid); if(!st) return;
     S.absences.push({id:session.id+"_"+sid,sessionId:session.id,studentId:sid,studentName:st.name,code:st.code,classId:session.classId,className:c?c.name:"",
       subject:session.subject,teacher:session.teacher,date:session.date,from:session.from,to:session.to,createdAt:now,
-      notifyAt:now+(Number(S.cfg.delayMin)||0)*60000,status:manual?"hold":"waiting",attempts:0});
+      notifyAt:now+(past?0:(Number(S.cfg.delayMin)||0)*60000),status:past&&!att.notifyPast?"skip":manual?"hold":"waiting",attempts:0});
   });
   if(se) se.savedAt=now;
   att.orig=new Set(att.absent); saveLocal();
@@ -1131,9 +1156,24 @@ function vSessions(){
     ${list.length?list.map(x=>{ const d=sessionData(x.id); const c=cls(x.classId);
       return `<div class="notif" style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
         <div><b>${esc(x.subject)}</b> · ${esc(c?c.name:"")}<br><span class="muted">الأستاذ(ة) ${esc(x.teacher)} · ${x.from}–${x.to}</span>
-        <div style="margin-top:4px"><span class="tag ok">حاضر ${d.present.length}</span> <span class="tag red">غائب ${d.absent.length}</span>${x.notes?` <span class="tag amb">ملاحظات</span>`:""}</div></div>
+        <div style="margin-top:4px"><span class="tag ok">حاضر ${d.present.length}</span> <span class="tag red">غائب ${d.absent.length}</span>${x.notes?` <span class="tag amb">ملاحظات</span>`:""}${x.edits&&x.edits.length?` <span class="tag amb">عُدّلت</span>`:""}</div></div>
         <div class="row" style="flex:0 0 auto;gap:6px"><button class="btn ghost sm" onclick="resumeSession('${x.id}')">الدخول إلى الحصة</button><button class="btn sm" onclick="openReport('${x.id}')">📄 ورقة الحصة</button></div></div>`; }).join("")
-    :`<div class="card empty">لا توجد حصص مسجّلة في هذا اليوم.</div>`}`;
+    :`<div class="card empty">لا توجد حصص مسجّلة في هذا اليوم.</div>`}
+    ${missedSlots()}`;
+}
+// حصص الجدول التي لم تُسجَّل في اليوم المختار (للتدارك)
+function missedSlots(){
+  if(sessDate>todayStr()) return "";
+  const d=new Date(sessDate+"T12:00:00").getDay(), now=hmMin(nowHM());
+  const list=S.timetable.filter(x=>x.day===d&&(!sessClass||x.classId===sessClass)&&cls(x.classId)&&subj(x.subjectId)&&period(x.periodId))
+    .filter(x=>{ const se=getSess("tt_"+x.id+"_"+sessDate); return !(se&&se.savedAt)&&!S.absences.some(a=>a.sessionId==="tt_"+x.id+"_"+sessDate); })
+    .filter(x=>sessDate<todayStr()||hmMin(period(x.periodId).from)<=now)
+    .sort((a,b)=>period(a.periodId).from.localeCompare(period(b.periodId).from)||cls(a.classId).name.localeCompare(cls(b.classId).name,"ar",{numeric:true}));
+  if(!list.length) return "";
+  return `<div class="card"><h2>حصص في الجدول لم تُسجَّل (${list.length})</h2><p class="muted" style="margin-top:0">يمكن تسجيلها الآن إذا نُسيت. ${sessDate<todayStr()?"لن تُرسل رسائل للأولياء إلا إذا اخترت ذلك داخل الحصة.":""}</p>
+    ${list.map(x=>{ const p=period(x.periodId), t=slotTeacher(x); return `<div class="notif" style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+      <div><b>${esc(subj(x.subjectId).name)}</b> · ${esc(cls(x.classId).name)}<br><span class="muted">${t?esc(t.name):"—"} · ${p.from}–${p.to}</span></div>
+      <button class="btn ghost sm" onclick="startFromSlot('${x.id}','${sessDate}')">تسجيل الغيابات</button></div>`; }).join("")}</div>`;
 }
 function resumeSession(id){
   const x=allSessions().find(z=>z.id===id); if(!x) return;
@@ -1153,7 +1193,7 @@ function vReport(){
   const dayName=DAY_NAMES[new Date(se.date+"T12:00:00").getDay()];
   const rate=total?Math.round(present.length*100/total):0;
   const z=sheetScale();
-  const st={sent:"أُعلم",waiting:"في الانتظار",sending:"جارٍ",failed:"لم يُعلم"};
+  const st={sent:"أُعلم",waiting:"في الانتظار",sending:"جارٍ",failed:"لم يُعلم",hold:"لم يُرسل",skip:"بدون رسالة"};
   return `<div class="rtool noprint">
       <button class="btn ghost sm" onclick="view=reportBack;render()">→ رجوع</button>
       <span class="zoom"><button class="btn ghost sm" onclick="setZoom(-0.1)">−</button><b>${Math.round(z*100)}%</b><button class="btn ghost sm" onclick="setZoom(0.1)">+</button><button class="btn ghost sm" onclick="setZoom(0)">ملاءمة</button></span>
@@ -1285,7 +1325,7 @@ function repClass(R){
 function repStudent(R){
   const s=S.students.find(x=>x.id===rp.stu); if(!s) return `<p>لا يوجد تلاميذ في هذا القسم.</p>`;
   const c=cls(s.classId), abs=S.absences.filter(a=>a.studentId===s.id&&inR(a.date,R)).sort((a,b)=>(a.date+a.from).localeCompare(b.date+b.from)), x=stuStats(s.id,abs);
-  const st={sent:"أُعلم",waiting:"في الانتظار",hold:"لم يُرسل",sending:"جارٍ",failed:"لم يُعلم"};
+  const st={sent:"أُعلم",waiting:"في الانتظار",hold:"لم يُرسل",sending:"جارٍ",failed:"لم يُعلم",skip:"بدون رسالة"};
   return `${docHead("بطاقة غيابات تلميذ",R[2])}
     <table class="sinfo"><tr><th>التلميذ(ة)</th><td><b>${esc(s.name)}</b></td><th>الرقم</th><td>${esc(s.code)}</td></tr><tr><th>القسم</th><td>${esc(c?c.name:"")}</td><th>الولي</th><td>${esc(s.parent||"")} ${s.phone?"— "+esc(s.phone):""}</td></tr></table>
     <div class="sstats"><div class="r"><b>${x.n}</b>عدد الغيابات</div><div><b>${fmtH(x.h)}</b>الساعات</div><div class="g"><b>${x.just}</b>مبررة</div><div class="r"><b>${fmtH(x.unjH)}</b>ساعات غير مبررة</div></div>
@@ -1581,10 +1621,11 @@ function timetableNowCard(){
   </div>`;
 }
 const ttSessionId=x=>"tt_"+x.id+"_"+todayStr();
-function startFromSlot(slotId){
+function startFromSlot(slotId,date){
   const x=S.timetable.find(z=>z.id===slotId); if(!x) return;
-  const p=period(x.periodId), t=slotTeacher(x);
-  session={id:ttSessionId(x),slotId:x.id,classId:x.classId,subject:subj(x.subjectId).name,teacher:t?t.name:"—",date:todayStr(),from:p.from,to:p.to};
+  const p=period(x.periodId), t=slotTeacher(x); date=date||todayStr();
+  const sid="tt_"+x.id+"_"+date, ex=getSess(sid);
+  session={id:sid,slotId:x.id,classId:x.classId,subject:ex?ex.subject:subj(x.subjectId).name,teacher:ex?ex.teacher:(t?t.name:"—"),date,from:p.from,to:p.to};
   ensureSession(session); lsSet("ghiyab_session",session); openAtt();
 }
 // أثناء الحصة: عند انتهاء وقتها يقترح الحصة التالية لنفس القسم حسب الجدول
