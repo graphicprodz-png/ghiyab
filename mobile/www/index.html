@@ -83,6 +83,15 @@ td.ltr{direction:ltr;text-align:end}
 .overlay{position:fixed;inset:0;background:rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;z-index:20;padding:16px}
 .dialog{background:#fff;border-radius:16px;padding:16px;max-width:420px;width:100%}
 .hide{display:none!important}
+#lock{position:fixed;inset:0;z-index:100;background:linear-gradient(160deg,#0f6b4f,#0b4f3b);display:flex;align-items:center;justify-content:center;padding:16px}
+.lockbox{background:#fff;border-radius:22px;padding:22px 20px;width:100%;max-width:340px;text-align:center}
+.dots{display:flex;gap:12px;justify-content:center;margin:16px 0 6px}.dots i{width:14px;height:14px;border-radius:50%;border:2px solid var(--brand)}.dots i.on{background:var(--brand)}
+.lockerr{color:var(--red);font-weight:700;min-height:22px;font-size:14px}
+.keypad{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:8px;direction:ltr}
+.keypad button{font-size:24px;font-weight:700;padding:14px 0;border-radius:14px;border:1px solid var(--line);background:#f6f9f7;cursor:pointer}
+.keypad button.ok{font-size:16px;background:var(--brand);color:#fff;border-color:var(--brand)}
+.linkbtn{border:0;background:none;color:var(--muted);margin-top:12px;cursor:pointer;text-decoration:underline}
+.hdrlock{border:0;background:rgba(255,255,255,.16);border-radius:8px;cursor:pointer;font-size:15px;padding:3px 8px;margin-inline-start:6px}
 .segs{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none}
 .segs button{border:0;background:none;padding:8px 12px;border-radius:9px;font-weight:600;white-space:nowrap;cursor:pointer;color:var(--muted)}
 .segs button.on{background:var(--brand);color:#fff}
@@ -198,7 +207,7 @@ table.tt td.full select{font-weight:700;color:var(--brand)}
 </head>
 <body>
 <header>
-  <h1><span id="hLogo">📋</span> <span id="schoolTitle">غياب</span></h1>
+  <h1><span id="hLogo">📋</span> <span id="schoolTitle">غياب</span> <button id="hLock" class="hdrlock hide" onclick="showLock()" title="قفل التطبيق">🔒</button></h1>
   <div class="sub" id="hDir"></div>
   <div class="sub">تسجيل غياب التلاميذ وإعلام الأولياء آلياً عبر SMS</div>
     <nav id="nav">
@@ -216,6 +225,7 @@ table.tt td.full select{font-weight:700;color:var(--brand)}
 </header>
 <main id="main"></main>
 <div id="modal"></div>
+<div id="lock" class="hide"></div>
 
 <script>
 /* ============ Data layer: shared db when available, otherwise this browser ============ */
@@ -238,6 +248,7 @@ const DEFAULT_CFG={
   warn1:6, warn2:12,
   calendar:[{id:"h1",type:"holiday",name:"عيد الثورة (1 نوفمبر)",from:"2026-11-01",to:"2026-11-01"},{id:"h2",type:"holiday",name:"رأس السنة الميلادية",from:"2027-01-01",to:"2027-01-01"},{id:"h3",type:"holiday",name:"يناير — رأس السنة الأمازيغية",from:"2027-01-12",to:"2027-01-12"},{id:"h4",type:"holiday",name:"عيد العمال",from:"2027-05-01",to:"2027-05-01"}],
   pin:"",
+  appPin:"", appRecovery:"", lockAfter:0,
   lastBackup:0,
   autoBackup:false, autoBackupH:1, lastAutoBackup:0, lastDailyBackup:"", autoBackupErr:"",
   autoSms:true,
@@ -408,6 +419,7 @@ function checkPin(){
 function render(){
   document.querySelectorAll("nav button").forEach(b=>b.classList.toggle("on",b.dataset.v===view));
   document.getElementById("schoolTitle").textContent=S.cfg.school||"غياب";
+  document.getElementById("hLock").classList.toggle("hide",!S.cfg.appPin);
   document.getElementById("hLogo").innerHTML=S.cfg.logo?`<img src="${S.cfg.logo}" alt="" style="height:30px;width:30px;object-fit:contain;background:#fff;border-radius:8px;padding:2px;vertical-align:middle">`:"📋";
   document.getElementById("hDir").textContent=S.cfg.directorate?"مديرية التربية لولاية "+S.cfg.directorate:"";
   updateBadge();
@@ -1027,7 +1039,7 @@ function setSms(){
 }
 function setData(){
   const c=S.cfg, days=c.lastBackup?Math.floor((Date.now()-c.lastBackup)/86400000):null;
-  return `<div class="card"><h2>رمز الحماية (PIN)</h2>
+  return `${appPinCard()}<div class="card"><h2>رمز الإدارة (PIN)</h2>
     <p class="muted" style="margin-top:0">يمنع غير الإدارة من تعديل الأقسام والتلاميذ والجدول والأساتذة والإعدادات. المشرف يستطيع تسجيل الغياب ومتابعة الإشعارات بدون رمز.</p>
     ${c.pin?`<p><span class="tag ok">الحماية مفعّلة</span></p>`:""}
     <div class="row" style="align-items:end">
@@ -1145,6 +1157,103 @@ function saveSettings(){
   toast("حُفظت الإعدادات");
 }
 
+/* ============ رمز الدخول إلى التطبيق ============ */
+// تجزئة بسيطة حتى لا يظهر الرمز كما هو في البيانات أو النسخة الاحتياطية
+function pinHash(p){ let h=2166136261; const t="ghiyab|"+p; for(let i=0;i<t.length;i++){ h^=t.charCodeAt(i); h=Math.imul(h,16777619)>>>0; } return "h"+h.toString(36); }
+let locked=!!S.cfg.appPin, lastTouch=Date.now(), hiddenAt=0, lockBuf="";
+function showLock(){
+  if(!S.cfg.appPin) return; locked=true; lockBuf="";
+  const el=document.getElementById("lock"); el.classList.remove("hide");
+  el.innerHTML=`<div class="lockbox">
+    ${S.cfg.logo?`<img src="${S.cfg.logo}" alt="" style="height:64px;object-fit:contain">`:'<div style="font-size:44px">🔐</div>'}
+    <h2 style="margin:6px 0 2px">${esc(S.cfg.school||"غياب")}</h2><div class="muted">أدخل رمز الدخول</div>
+    <div class="dots" id="lockDots"></div><div class="lockerr" id="lockErr"></div>
+    <div class="keypad">${[1,2,3,4,5,6,7,8,9].map(n=>`<button onclick="lockKey('${n}')">${n}</button>`).join("")}<button onclick="lockKey('del')">⌫</button><button onclick="lockKey('0')">0</button><button class="ok" onclick="lockKey('ok')">دخول</button></div>
+    <button class="linkbtn" onclick="lockForgot()">نسيت الرمز؟</button></div>`;
+  lockDots();
+}
+function lockDots(){ const d=document.getElementById("lockDots"); if(d) d.innerHTML=Array.from({length:Math.max(4,lockBuf.length)},(_,i)=>`<i class="${i<lockBuf.length?"on":""}"></i>`).join(""); }
+function lockKey(k){
+  const err=document.getElementById("lockErr"); if(err) err.textContent="";
+  if(k==="del") lockBuf=lockBuf.slice(0,-1);
+  else if(k==="ok") return lockTry();
+  else if(lockBuf.length<8) lockBuf+=k;
+  lockDots();
+  if(lockBuf.length>=4&&pinHash(lockBuf)===S.cfg.appPin) lockTry();
+}
+function lockTry(){
+  if(pinHash(lockBuf)===S.cfg.appPin||(S.cfg.pin&&lockBuf===S.cfg.pin)){
+    if(S.cfg.pin&&lockBuf===S.cfg.pin) unlockUntil=Date.now()+15*60000; // رمز الإدارة يفتح أيضاً صفحات الإدارة
+    locked=false; lastTouch=Date.now(); lockBuf=""; const el=document.getElementById("lock"); el.classList.add("hide"); el.innerHTML=""; render(); return;
+  }
+  lockBuf=""; lockDots(); const err=document.getElementById("lockErr"); if(err) err.textContent="الرمز غير صحيح";
+  try{ navigator.vibrate&&navigator.vibrate(150); }catch(e){}
+}
+function lockForgot(){
+  const el=document.querySelector("#lock .lockbox");
+  el.innerHTML=`<div style="font-size:40px">🗝️</div><h2>استرجاع الدخول</h2><p class="muted">أدخل رمز الاسترجاع الذي ظهر عند تفعيل رمز الدخول (8 أرقام).</p>
+    <input id="recIn" inputmode="numeric" maxlength="8" style="text-align:center;font-size:22px;letter-spacing:4px;width:100%;direction:ltr">
+    <div class="lockerr" id="lockErr"></div>
+    <div class="row" style="margin-top:10px"><button class="btn" onclick="lockRecover()">تأكيد</button><button class="btn ghost" onclick="showLock()">رجوع</button></div>`;
+}
+function lockRecover(){
+  const v=document.getElementById("recIn").value.trim();
+  if(v&&pinHash(v)===S.cfg.appRecovery){ S.cfg.appPin=""; S.cfg.appRecovery=""; saveLocal(); locked=false; document.getElementById("lock").classList.add("hide");
+    view="settings"; setTab="data"; unlockUntil=Date.now()+15*60000; render(); toast("أُلغي رمز الدخول. عيّن رمزاً جديداً الآن."); }
+  else document.getElementById("lockErr").textContent="رمز الاسترجاع غير صحيح";
+}
+["pointerdown","keydown","touchstart"].forEach(ev=>document.addEventListener(ev,()=>{ lastTouch=Date.now(); },{passive:true}));
+document.addEventListener("visibilitychange",()=>{
+  if(document.hidden){ hiddenAt=Date.now(); return; }
+  const away=Date.now()-hiddenAt; // مهلة 30 ثانية حتى لا يُقفل عند فتح واتساب أو نافذة الطباعة
+  if(S.cfg.appPin&&!locked&&(Number(S.cfg.lockAfter)===0?away>30000:away>Number(S.cfg.lockAfter)*60000)) showLock();
+});
+setInterval(()=>{ const m=Number(S.cfg.lockAfter); if(S.cfg.appPin&&!locked&&m>0&&Date.now()-lastTouch>m*60000) showLock(); },15000);
+function appPinCard(){
+  const c=S.cfg;
+  return `<div class="card"><h2>🔐 رمز الدخول إلى التطبيق</h2>
+    <p class="muted" style="margin-top:0">يُطلب عند فتح التطبيق، فلا يستطيع أي شخص يمسك الطابليت رؤية البيانات. الإرسال الآلي للرسائل يستمر حتى والتطبيق مقفل.</p>
+    ${c.appPin?`<p><span class="tag ok">رمز الدخول مفعّل</span></p>
+      <div class="row" style="align-items:end">
+        <label class="f" style="margin:0">قفل التطبيق<select onchange="saveCfg({...S.cfg,lockAfter:Number(this.value)})">${[[0,"عند فتحه وعند العودة إليه بعد الخروج منه"],[5,"بعد 5 دقائق دون استعمال"],[15,"بعد 15 دقيقة دون استعمال"],[30,"بعد 30 دقيقة دون استعمال"],[60,"بعد ساعة دون استعمال"]].map(([v,t])=>`<option value="${v}" ${Number(c.lockAfter)===v?"selected":""}>${t}</option>`).join("")}</select></label>
+        <button class="btn ghost" style="flex:0 0 auto" onclick="showLock()">🔒 قفل الآن</button>
+      </div>
+      <div class="row" style="align-items:end;margin-top:10px">
+        <label class="f" style="margin:0">الرمز الحالي<input id="apCur" type="password" inputmode="numeric" maxlength="8" style="direction:ltr;letter-spacing:4px"></label>
+        <label class="f" style="margin:0">الرمز الجديد<input id="apNew" type="password" inputmode="numeric" maxlength="8" style="direction:ltr;letter-spacing:4px"></label>
+        <button class="btn" style="flex:0 0 auto" onclick="changeAppPin()">تغيير الرمز</button>
+        <button class="btn ghost" style="flex:0 0 auto" onclick="disableAppPin()">إلغاء رمز الدخول</button>
+      </div>`
+    :`<div class="row" style="align-items:end">
+        <label class="f" style="margin:0">الرمز (4 إلى 8 أرقام)<input id="apNew" type="password" inputmode="numeric" maxlength="8" style="direction:ltr;letter-spacing:4px"></label>
+        <label class="f" style="margin:0">تأكيد الرمز<input id="apNew2" type="password" inputmode="numeric" maxlength="8" style="direction:ltr;letter-spacing:4px"></label>
+        <button class="btn" style="flex:0 0 auto" onclick="enableAppPin()">تفعيل رمز الدخول</button>
+      </div>`}
+    <p class="muted" style="margin-bottom:0">رمز الإدارة (أسفله) يفتح التطبيق أيضاً، ويفتح معه صفحات الإدارة.</p></div>`;
+}
+function enableAppPin(){
+  const a=document.getElementById("apNew").value.trim(), b=document.getElementById("apNew2").value.trim();
+  if(!/^\d{4,8}$/.test(a)) return toast("الرمز من 4 إلى 8 أرقام",true);
+  if(a!==b) return toast("الرمزان غير متطابقين",true);
+  const rec=String(Math.floor(10000000+Math.random()*89999999));
+  saveCfg({...S.cfg,appPin:pinHash(a),appRecovery:pinHash(rec)});
+  document.getElementById("modal").innerHTML=`<div class="overlay"><div class="dialog" style="text-align:center"><div style="font-size:40px">🗝️</div>
+    <h2 style="margin:4px 0">فُعّل رمز الدخول</h2><p>اكتب <b>رمز الاسترجاع</b> واحفظه في مكان آمن. يُستعمل إذا نُسي رمز الدخول، ولن يظهر مرة أخرى:</p>
+    <div style="font-size:30px;font-weight:800;letter-spacing:6px;direction:ltr;background:var(--brand-2);border-radius:12px;padding:10px;margin:8px 0">${rec}</div>
+    <button class="btn" onclick="closeModal()">كتبته، متابعة</button></div></div>`;
+}
+function changeAppPin(){
+  const cur=document.getElementById("apCur").value.trim(), n=document.getElementById("apNew").value.trim();
+  if(pinHash(cur)!==S.cfg.appPin) return toast("الرمز الحالي غير صحيح",true);
+  if(!/^\d{4,8}$/.test(n)) return toast("الرمز الجديد من 4 إلى 8 أرقام",true);
+  saveCfg({...S.cfg,appPin:pinHash(n)}); toast("✓ تغيّر رمز الدخول");
+}
+function disableAppPin(){
+  const cur=document.getElementById("apCur").value.trim();
+  if(pinHash(cur)!==S.cfg.appPin) return toast("أدخل الرمز الحالي في خانة «الرمز الحالي» للإلغاء",true);
+  saveCfg({...S.cfg,appPin:"",appRecovery:""}); toast("أُلغي رمز الدخول");
+}
+
 /* --- Backup / restore --- */
 const backupName=()=>`ghiyab-نسخة-${todayStr()}-${nowHM().replace(":","")}.json`;
 const toB64=blob=>new Promise(r=>{ const fr=new FileReader(); fr.onload=()=>r(String(fr.result).split(",")[1]); fr.readAsDataURL(blob); });
@@ -1190,7 +1299,7 @@ function applyBackup(txt){
   document.getElementById("modal").innerHTML=`<div class="overlay"><div class="dialog"><h2 style="margin-top:0">استرجاع النسخة؟</h2>
     <p>${d.classes.length} قسم، ${d.students.length} تلميذ، ${d.absences.length} غياب.<br>ستُستبدل كل البيانات الحالية على هذا الجهاز.</p>
     <div class="row"><button class="btn red" id="okRestore">استرجاع</button><button class="btn ghost" onclick="closeModal()">إلغاء</button></div></div></div>`;
-  document.getElementById("okRestore").onclick=()=>{ DATA_KEYS.forEach(k=>{ S[k]=Array.isArray(d[k])?d[k]:[]; }); S.cfg={...DEFAULT_CFG,...(d.cfg||{})}; saveLocal(); closeModal(); toast("استُرجعت البيانات"); };
+  document.getElementById("okRestore").onclick=()=>{ setTimeout(()=>{ if(S.cfg.appPin) showLock(); },300); DATA_KEYS.forEach(k=>{ S[k]=Array.isArray(d[k])?d[k]:[]; }); S.cfg={...DEFAULT_CFG,...(d.cfg||{})}; saveLocal(); closeModal(); toast("استُرجعت البيانات"); };
 }
 function restoreFile(inp){ const f=inp.files&&inp.files[0]; inp.value=""; if(!f) return; const r=new FileReader(); r.onload=()=>applyBackup(String(r.result)); r.readAsText(f); }
 function restorePaste(){
@@ -1929,6 +2038,7 @@ async function seedDemo(){
 }
 
 /* ============ Boot ============ */
+setTimeout(()=>{ if(S.cfg.appPin) showLock(); },0);
 window.addEventListener("resize",()=>{ if(["report","reports","letter"].includes(view)&&!zoom) render(); });
 render();
 if(IS_APP){ try{ const p=smsPlugin(); p&&p.keepAwake&&p.keepAwake(); }catch(e){} }
