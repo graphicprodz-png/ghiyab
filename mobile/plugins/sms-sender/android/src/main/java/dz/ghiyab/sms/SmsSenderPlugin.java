@@ -354,7 +354,20 @@ public class SmsSenderPlugin extends Plugin {
         }, TIMEOUT_MS);
 
         try {
-            sms.sendMultipartTextMessage(phone.trim(), null, parts, sentIntents, null);
+            // تقرير الاستلام: نطلبه على آخر جزء من الرسالة فقط
+            ArrayList<PendingIntent> dlv = null;
+            String ref = call.getString("ref");
+            if (ref != null && !ref.isEmpty()) {
+                dlv = new ArrayList<>();
+                int dflags = PendingIntent.FLAG_UPDATE_CURRENT | (Build.VERSION.SDK_INT >= 31 ? PendingIntent.FLAG_MUTABLE : 0);
+                for (int i = 0; i < total; i++) {
+                    if (i < total - 1) { dlv.add(null); continue; }
+                    Intent di = new Intent(ctx, DeliveryReceiver.class);
+                    di.putExtra("ref", ref);
+                    dlv.add(PendingIntent.getBroadcast(ctx, base + 5 + i, di, dflags));
+                }
+            }
+            sms.sendMultipartTextMessage(phone.trim(), null, parts, sentIntents, dlv);
         } catch (Exception e) {
             synchronized (finished) {
                 if (!finished[0]) {
@@ -378,6 +391,15 @@ public class SmsSenderPlugin extends Plugin {
             case SmsManager.RESULT_ERROR_GENERIC_FAILURE: return "GENERIC";
             default: return "E" + code;
         }
+    }
+
+    @PluginMethod
+    public void getDeliveries(PluginCall call) {
+        SharedPreferences sp = getContext().getSharedPreferences(DeliveryReceiver.PREFS, Context.MODE_PRIVATE);
+        JSObject r = new JSObject();
+        try { r.put("d", new org.json.JSONObject(sp.getString("d", "{}"))); } catch (Exception e) { r.put("d", new JSObject()); }
+        if (Boolean.TRUE.equals(call.getBoolean("clear", false))) sp.edit().putString("d", "{}").apply();
+        call.resolve(r);
     }
 
     // ===== حجب المكالمات (أندرويد 10 فما فوق) =====
