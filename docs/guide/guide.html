@@ -87,6 +87,9 @@ table.t tr:nth-child(even) td{background:#f7faf8}
 .cover .bottom .by small{display:block;font:400 8.5pt "GE SS Two","Inter";opacity:.8;letter-spacing:0}
 /* ---------- toc ---------- */
 .toc{list-style:none;padding:0;margin:0}
+.toc li{padding:1.05mm 0!important;font-size:10.3pt!important;line-height:1.35!important}.toc li .tt small{font-size:8.2pt!important}
+.pane{border:.35mm solid var(--line);border-radius:4mm;overflow:hidden;box-shadow:0 2.5mm 7mm rgba(10,40,30,.12);background:#fff}.pane img{display:block;width:100%}
+.new{display:inline-block;background:#e0483a;color:#fff;font:700 7.5pt "Inter";padding:.6mm 2mm;border-radius:2mm;margin-inline-start:2mm;vertical-align:middle}
 .toc li{display:flex;align-items:center;gap:4mm;padding:1.9mm 0;border-bottom:.3mm dashed var(--line);font-size:11pt;line-height:1.45}
 .toc li .n{width:8mm;height:8mm;border-radius:2.6mm;background:var(--gl);color:var(--g);font:800 10pt "Inter";display:flex;align-items:center;justify-content:center}
 .toc li .tt{flex:1}
@@ -207,7 +210,7 @@ table.t tr:nth-child(even) td{background:#f7faf8}
     <div class="tab dv1"><img src="shots/04_roster.png" alt=""></div>
   </div>
   <div class="bottom">
-    <div>الإصدار <span class="lat">1.18</span><br>السنة الدراسية <span class="lat">2026/2027</span></div>
+    <div>الإصدار <span class="lat">1.25</span><br>السنة الدراسية <span class="lat">2026/2027</span></div>
     <div class="by" style="text-align:left">TitteriSoft<small>تصميم وتطوير</small></div>
   </div>
 </section>
@@ -231,7 +234,11 @@ table.t tr:nth-child(even) td{background:#f7faf8}
     <li><span class="n">12</span><span class="tt">التقارير والوثائق<small>ورقة الحصة، تقارير القسم والتلميذ، الاستدعاءات</small></span><span class="pg">14</span></li>
     <li><span class="n">13</span><span class="tt">العطل والاختبارات والتوقيت الخاص<small>الرزنامة المدرسية</small></span><span class="pg">15</span></li>
     <li><span class="n">14</span><span class="tt">الحماية والنسخ الاحتياطي<small>رمز الدخول، رمز الإدارة، تغيير الجهاز</small></span><span class="pg">16</span></li>
-    <li><span class="n">15</span><span class="tt">نصائح ذهبية وأسئلة شائعة</span><span class="pg">17</span></li>
+    <li><span class="n">15</span><span class="tt">رصيد الشريحة وتأكيد الوصول<span class="new">جديد</span><small>✓✓ وصلت، تنبيه نفاد الرصيد، فحص الرصيد</small></span><span class="pg">17</span></li>
+    <li><span class="n">16</span><span class="tt">طابليت للرسائل فقط<span class="new">جديد</span><small>حجب المكالمات، الرد الآلي، جرس بداية الحصص</small></span><span class="pg">18</span></li>
+    <li><span class="n">17</span><span class="tt">أدوات الإدارة<span class="new">جديد</span><small>أرقام التلاميذ، التأخر، موافقة الأولياء، عدة طابليتات</small></span><span class="pg">19</span></li>
+    <li><span class="n">18</span><span class="tt">التفعيل وخطوات البداية<span class="new">جديد</span><small>30 يوماً تجربة، رمز الجهاز، مفتاح الترخيص</small></span><span class="pg">20</span></li>
+    <li><span class="n">19</span><span class="tt">نصائح ذهبية وأسئلة شائعة</span><span class="pg">21</span></li>
   </ol>
 </div><div class="pf"><span class="br"><img src="icon.png" alt="">دليل استخدام حضوري – <span class="lat">HODOURI</span></span><span class="pn">2</span></div></section>
 
@@ -301,6 +308,7 @@ table.t tr:nth-child(even) td{background:#f7faf8}
         <li><b>رمز الدخول (اختياري ومستحسن):</b> من «الإعدادات ← الحماية والنسخ» فعّل رمزاً من 4 إلى 8 أرقام، واحتفظ برمز الاسترجاع.</li>
       </ol>
       <div class="tip"><span class="ic"><svg><use href="#i-bulb"/></svg></span><div><b>للتجربة قبل الإعداد الفعلي</b>اضغط «إضافة بيانات تجريبية» في الشاشة الأولى: يضيف التطبيق أربعة أقسام بجداولها وأساتذتها لتتعرّف على طريقة العمل، ثم احذفها من «الحماية والنسخ ← حذف كل البيانات».</div></div>
+      <div class="tip g"><span class="ic"><svg><use href="#i-check"/></svg></span><div><b>خطوات البداية</b>في الشاشة الرئيسية قائمة «🚀 خطوات البداية» ترشدك مرحلة بمرحلة حتى يصبح التطبيق جاهزاً (الصفحة 20).</div></div>
       <div class="tip b"><span class="ic"><svg><use href="#i-download"/></svg></span><div><b>التحديثات</b>كل إصدار جديد يُثبَّت فوق القديم مباشرة دون فقدان أي بيانات.</div></div>
     </div>
     <div><div class="tab" style="width:78mm;margin:6mm auto 0"><img src="shots/21_lock.png" alt=""></div><div class="cap">شاشة رمز الدخول: شعار المؤسسة ولوحة أرقام كبيرة</div></div>
@@ -330,7 +338,7 @@ table.t tr:nth-child(even) td{background:#f7faf8}
 <!-- ======================= 7. STUDENTS & EXCEL ======================= -->
 <section class="page"><div class="secband"></div><div class="in">
   <div class="ph"><div class="num">05</div><div class="t"><small>الإعداد — مرة واحدة</small><h2>الأقسام والتلاميذ واستيراد Excel</h2></div><div class="line"></div></div>
-  <div class="tab w"><img src="shots/16_students.png" alt=""></div>
+  <div class="tab w" style="width:122mm"><img src="shots/16_students.png" alt=""></div>
   <div class="cols" style="margin-top:6mm">
     <div>
       <h3 style="font-size:12.5pt;margin-bottom:3mm">ثلاث طرق لإدخال التلاميذ</h3>
@@ -350,8 +358,9 @@ table.t tr:nth-child(even) td{background:#f7faf8}
         <tr><td>الولي</td><td>اسم الولي، ولي الأمر</td></tr>
         <tr><td>الهاتف</td><td>هاتف الولي، الهاتف، رقم الهاتف</td></tr>
         <tr><td>القسم (اختياري)</td><td>القسم، الفوج</td></tr>
+        <tr><td>رقم التلميذ (اختياري)</td><td>الرقم، رقم التسجيل، رقم التعريف</td></tr>
       </table>
-      <div class="tip g"><span class="ic"><svg><use href="#i-barcode"/></svg></span><div><b>رقم وكودبار تلقائي</b>لكل تلميذ رقم وكودبار يُطبعان من «ملصقات الكودبار» ويُلصقان في الدفتر اليومي.</div></div>
+      <div class="tip g"><span class="ic"><svg><use href="#i-barcode"/></svg></span><div><b>رقم التلميذ والكودبار</b>رقم تحدده الإدارة (أو يُولَّد تلقائياً)، ويُقرأ من عمود «الرقم / رقم التسجيل» في ملف Excel. الكودبار يُطبع من «ملصقات الكودبار».</div></div>
     </div>
   </div>
   <div class="tip"><span class="ic"><svg><use href="#i-warn"/></svg></span><div><b>الصفر في أول رقم الهاتف</b>إذا حذف Excel الصفر من بداية الرقم (مثل 550123456)، يُعيده التطبيق تلقائياً عند الاستيراد.</div></div>
@@ -400,7 +409,7 @@ table.t tr:nth-child(even) td{background:#f7faf8}
 <!-- ======================= 10. ROSTER ======================= -->
 <section class="page"><div class="secband"></div><div class="in">
   <div class="ph"><div class="num">08</div><div class="t"><small>الاستعمال اليومي</small><h2>تسجيل الغياب والحفظ</h2></div><div class="line"></div></div>
-  <p class="lead">عند فتح الحصة يظهر اسم الأستاذ والمادة والتوقيت، ثم كل تلاميذ القسم بالترتيب الرسمي و<b class="hl">كلهم «حاضر»</b>. المكلّف يدخل القسم ويحوّل الغائبين فقط.</p>
+  <p class="lead">عند فتح الحصة يظهر اسم الأستاذ والمادة والتوقيت، ثم كل تلاميذ القسم بالترتيب الرسمي و<b class="hl">كلهم «حاضر»</b>. المكلّف يدخل القسم ويحوّل الغائبين فقط، ويسجّل المتأخرين عند التحاقهم.</p>
   <div class="tab" style="position:relative"><img src="shots/04_roster.png" alt="">
     <span class="callout" style="top:25mm;right:28mm">1</span>
     <span class="callout" style="top:40mm;left:40mm">2</span>
@@ -415,7 +424,7 @@ table.t tr:nth-child(even) td{background:#f7faf8}
       <li><i>3</i><div><b>مسح الكودبار:</b> بقارئ أو بكاميرا الطابليت، يسجّل التلميذ غائباً مباشرة.</div></li>
     </ul>
     <ul class="legend">
-      <li><i>4</i><div><b>الضغط على التلميذ الغائب</b> يحوّله إلى «غائب» بالأحمر، وضغطة ثانية تعيده «حاضر».</div></li>
+      <li><i>4</i><div><b>الضغط على التلميذ:</b> ضغطة = «غائب» بالأحمر، ضغطة ثانية = «متأخر» بالبرتقالي مع ساعة التحاقه (يُلغى غيابه)، ضغطة ثالثة = «حاضر».</div></li>
       <li><i>5</i><div><b>💾 حفظ:</b> يسجّل الغيابات. وإذا حاولت الخروج قبل الحفظ يسألك التطبيق.</div></li>
       <li><i>+</i><div><b>ملاحظات الحصة</b> أسفل القائمة (تأخر، طرد، تعويض…) تظهر في ورقة الحصة.</div></li>
     </ul>
@@ -545,9 +554,90 @@ table.t tr:nth-child(even) td{background:#f7faf8}
   <div class="tip r"><span class="ic"><svg><use href="#i-warn"/></svg></span><div><b>نصيحة لا تُهمل</b>الحفظ التلقائي يبقى داخل الطابليت. أرسل نسخة لنفسك مرة في الأسبوع على الأقل، حتى لا تضيع البيانات إذا ضاع الجهاز.</div></div>
 </div><div class="pf"><span class="br"><img src="icon.png" alt="">دليل استخدام حضوري – <span class="lat">HODOURI</span></span><span class="pn">16</span></div></section>
 
+<section class="page"><div class="secband"></div><div class="in">
+  <div class="ph"><div class="num">15</div><div class="t"><small>إعلام الأولياء</small><h2>رصيد الشريحة وتأكيد الوصول</h2></div><div class="line"></div></div>
+  <p class="lead">لكل رسالة يطلب التطبيق <b class="hl">تقرير استلام</b> من الشبكة، ويراقب رصيد الشرائح حتى لا يتوقف إعلام الأولياء دون أن تنتبه.</p>
+  <div class="cols" style="align-items:start">
+    <div><div class="tab"><img src="shots/07_notifs.png" alt=""></div><div class="cap">الإشعارات: عدّاد «✓✓ وصلت» وحالة كل رسالة</div></div>
+    <div><div class="tab"><img src="shots/24_credit.png" alt=""></div><div class="cap">نفاد الرصيد: شريط أحمر في كل الصفحات مع صوت واهتزاز</div></div>
+  </div>
+  <div class="cols3" style="margin-top:6mm">
+    <div class="card"><h4><span class="ic"><svg><use href="#i-check"/></svg></span>✓✓ وصلت</h4><p>الرسالة وصلت فعلاً إلى هاتف الولي، مع ساعة الوصول. دليل للمؤسسة إذا قال ولي إنها لم تصله.</p></div>
+    <div class="card"><h4><span class="ic r"><svg><use href="#i-warn"/></svg></span>✗ لم تصل</h4><p>الرقم خاطئ أو خارج الخدمة: تظهر أزرار SMS يدوي وواتساب لإعلام الولي بطريقة أخرى.</p></div>
+    <div class="card"><h4><span class="ic a"><svg><use href="#i-sim"/></svg></span>نفاد الرصيد</h4><p>بعد فشلين متتاليين من نفس الشريحة يتوقف الإرسال منها، وتبقى الرسائل في الانتظار حتى «استئناف الإرسال».</p></div>
+  </div>
+  <div class="cols" style="margin-top:6mm;grid-template-columns:1.25fr 1fr;align-items:center">
+    <div class="pane"><img src="shots/25_credit.png" alt=""></div>
+    <ol class="steps">
+      <li><b>فحص الرصيد</b> من داخل التطبيق لكل شريحة: موبيليس <span class="lat">*222#</span>، جيزي <span class="lat">*710#</span>، أوريدو <span class="lat">*200#</span> (قابلة للتعديل).</li>
+      <li><b>فحص يومي تلقائي</b> عند بداية ساعات الإرسال، وتنبيه برتقالي إذا نزل الرصيد تحت حد تختاره.</li>
+      <li><b>بعد الشحن</b> اضغط «▶️ استئناف الإرسال» فتخرج كل الرسائل المنتظرة.</li>
+    </ol>
+  </div>
+</div><div class="pf"><span class="br"><img src="icon.png" alt="">دليل استخدام حضوري – <span class="lat">HODOURI</span></span><span class="pn">17</span></div></section>
+
+<section class="page"><div class="secband"></div><div class="in">
+  <div class="ph"><div class="num">16</div><div class="t"><small>تهيئة الطابليت</small><h2>طابليت للرسائل فقط</h2></div><div class="line"></div></div>
+  <p class="lead">من <b>الإعدادات ← الإرسال والشرائح</b> تجعل الطابليت مخصصاً لإشعارات الغياب: لا يرنّ أثناء الدوام، ولا يُستهلك رصيده في المكالمات.</p>
+  <div class="cols" style="grid-template-columns:1.1fr 1fr;align-items:start">
+    <div class="pane"><img src="shots/26_calls.png" alt=""></div>
+    <div>
+      <ul class="legend">
+        <li><i>1</i><div><b>حجب المكالمات الواردة:</b> تُرفض دون رنين وتُسجَّل في «آخر المكالمات المحجوبة».</div></li>
+        <li><i>2</i><div><b>حجب المكالمات الصادرة:</b> تُلغى أي محاولة اتصال من الطابليت. أرقام الطوارئ تبقى متاحة دائماً.</div></li>
+        <li><i>3</i><div><b>الرد الآلي:</b> رسالة لمن يتصل (مرة في اليوم لكل رقم) فيها هاتف المؤسسة.</div></li>
+      </ul>
+      <div class="tip"><span class="ic"><svg><use href="#i-warn"/></svg></span><div><b>أول تفعيل</b>يسأل أندرويد عن «تطبيق فلترة المكالمات» و«توجيه المكالمات»: اختر «حضوري» في الحالتين. يتطلب أندرويد 10 أو أحدث.</div></div>
+    </div>
+  </div>
+  <h3 style="font-size:13pt;margin:7mm 0 3mm">🔔 جرس بداية الحصص</h3>
+  <div class="cols" style="grid-template-columns:1.25fr 1fr;align-items:center">
+    <div class="pane"><img src="shots/27_bell.png" alt=""></div>
+    <ul class="legend">
+      <li><i>1</i><div>من <b>الإعدادات ← السنة والتوقيت</b>: ثلاث نغمات هادئة، مستوى الصوت، وموعد التنبيه (عند البداية أو قبلها بدقيقتين أو 5 دقائق).</div></li>
+      <li><i>2</i><div>يتبع فترات الحصص، ويسكت تلقائياً في العطل وأيام الراحة، ويتبع توقيت الاختبارات.</div></li>
+      <li><i>3</i><div>يرنّ والتطبيق مفتوح، بعد أول لمسة للشاشة.</div></li>
+    </ul>
+  </div>
+</div><div class="pf"><span class="br"><img src="icon.png" alt="">دليل استخدام حضوري – <span class="lat">HODOURI</span></span><span class="pn">18</span></div></section>
+
+<section class="page"><div class="secband"></div><div class="in">
+  <div class="ph"><div class="num">17</div><div class="t"><small>الإدارة</small><h2>أدوات الإدارة</h2></div><div class="line"></div></div>
+  <div class="cols" style="align-items:start">
+    <div><div class="tab"><img src="shots/32_renumber.png" alt=""></div><div class="cap">🔢 ترقيم تلاميذ القسم: بادئة، أول رقم، عدد الخانات</div></div>
+    <div><div class="tab"><img src="shots/31_consent.png" alt=""></div><div class="cap">🖨️ استمارات موافقة الأولياء: ثلاث في كل صفحة A4</div></div>
+  </div>
+  <div class="cols3" style="margin-top:5mm">
+    <div class="card"><h4><span class="ic"><svg><use href="#i-barcode"/></svg></span>رقم التلميذ</h4><p>تحدده الإدارة (أرقام، حروف لاتينية، شرطة) من «تعديل»، أو بترقيم القسم كاملاً. لا يتكرر، والغيابات السابقة تبقى مرتبطة بالتلميذ.</p></div>
+    <div class="card"><h4><span class="ic b"><svg><use href="#i-shield"/></svg></span>موافقة الأولياء</h4><p>استمارة لكل تلميذ فيها الرقم المسجّل وخانة الرقم الصحيح والإمضاء، وفق القانون 18-07. صحّح الأرقام بعد استرجاعها.</p></div>
+    <div class="card"><h4><span class="ic a"><svg><use href="#i-clock"/></svg></span>التأخر</h4><p>يُسجَّل بساعته، ويظهر في ورقة الحصة وبطاقة التلميذ وتقرير القسم، ولا يُحسب غياباً. رسالته اختيارية.</p></div>
+  </div>
+  <div class="cols" style="margin-top:5mm;align-items:center">
+    <div class="pane"><img src="shots/28_late_msg.png" alt=""></div>
+    <div class="pane"><img src="shots/30_merge.png" alt=""></div>
+  </div>
+  <div class="tip b" style="margin-top:5mm"><span class="ic"><svg><use href="#i-share"/></svg></span><div><b>عدة طابليتات في مؤسسة كبيرة</b>جهّز الطابليت الرئيسي ثم استرجع نسخته الاحتياطية في الطابليتات الأخرى. كل طابليت يسجّل ويرسل لأقسامه، ثم «📤 تصدير السجلات» و«📥 دمج ملف من طابليت آخر» في الرئيسي: لا تكرار، ولا رسالة تُرسل مرتين.</div></div>
+</div><div class="pf"><span class="br"><img src="icon.png" alt="">دليل استخدام حضوري – <span class="lat">HODOURI</span></span><span class="pn">19</span></div></section>
+
+<section class="page"><div class="secband"></div><div class="in">
+  <div class="ph"><div class="num">18</div><div class="t"><small>البداية</small><h2>التفعيل وخطوات البداية</h2></div><div class="line"></div></div>
+  <div class="cols" style="grid-template-columns:1fr 1fr;align-items:start">
+    <div><div class="tab"><img src="shots/23_setup.png" alt=""></div><div class="cap">الشاشة الرئيسية عند أول تشغيل: خطوات البداية والفترة التجريبية</div></div>
+    <div class="pane"><img src="shots/29_lic.png" alt=""></div>
+  </div>
+  <h3 style="font-size:13pt;margin:7mm 0 4mm">من التجربة إلى التفعيل</h3>
+  <div class="flow" style="grid-template-columns:repeat(4,1fr)">
+    <div class="fs"><div class="c"><i>1</i><svg><use href="#i-clock"/></svg></div><h4>30 يوماً تجربة</h4><p>كل الخصائص مفتوحة من أول تشغيل، مع شريط يبيّن الأيام الباقية</p></div>
+    <div class="fs"><div class="c"><i>2</i><svg><use href="#i-sms"/></svg></div><h4>رمز الجهاز</h4><p>الإعدادات ← حول التطبيق ← الترخيص: زر «اطلب المفتاح عبر واتساب»</p></div>
+    <div class="fs"><div class="c"><i>3</i><svg><use href="#i-pen"/></svg></div><h4>الصق المفتاح</h4><p>الصق الرسالة كاملة في خانة التفعيل، والتطبيق يستخرج المفتاح وحده</p></div>
+    <div class="fs last"><div class="c"><i>4</i><svg><use href="#i-check"/></svg></div><h4>مفعّل</h4><p>تظهر مدة الترخيص، وتنبيه قبل انتهائه بـ 15 يوماً</p></div>
+  </div>
+  <div class="tip g" style="margin-top:6mm"><span class="ic"><svg><use href="#i-shield"/></svg></span><div><b>بياناتك في أمان</b>عند انتهاء التجربة أو الترخيص تبقى كل البيانات كما هي، ويبقى زر «حفظ نسخة احتياطية» متاحاً. المفتاح خاص بطابليت المؤسسة ولا يعمل على جهاز آخر.</div></div>
+</div><div class="pf"><span class="br"><img src="icon.png" alt="">دليل استخدام حضوري – <span class="lat">HODOURI</span></span><span class="pn">20</span></div></section>
+
 <!-- ======================= 17. TIPS & FAQ ======================= -->
 <section class="page"><div class="secband"></div><div class="in">
-  <div class="ph"><div class="num">15</div><div class="t"><small>للاستعمال الأمثل</small><h2>نصائح ذهبية وأسئلة شائعة</h2></div><div class="line"></div></div>
+  <div class="ph"><div class="num">19</div><div class="t"><small>للاستعمال الأمثل</small><h2>نصائح ذهبية وأسئلة شائعة</h2></div><div class="line"></div></div>
   <div class="cols4">
     <div class="kpi"><b style="font-size:16pt">⚡</b><span>اترك التطبيق مفتوحاً والطابليت موصولة بالشاحن أثناء الدوام</span></div>
     <div class="kpi a"><b style="font-size:16pt">✉</b><span>اختصر نص الرسالة لتكلّف رسالة واحدة أو اثنتين</span></div>
@@ -558,12 +648,13 @@ table.t tr:nth-child(even) td{background:#f7faf8}
     <div class="q"><h4><span>؟</span>هل يحتاج التطبيق إلى الإنترنت؟</h4><p>لا. التسجيل والرسائل والتقارير كلها تعمل بدون إنترنت. الإنترنت مفيد فقط لإرسال النسخة الاحتياطية عبر واتساب أو البريد.</p></div>
     <div class="q"><h4><span>؟</span>كم تكلّف الرسائل؟</h4><p>تُحتسب من رصيد شريحة الطابليت حسب عرض المتعامل. عدّاد في «الإعدادات ← الرسائل» يبيّن عدد الرسائل لكل غياب.</p></div>
     <div class="q"><h4><span>؟</span>ماذا لو أُغلق التطبيق أو انطفأت الطابليت؟</h4><p>لا تضيع أي رسالة: كل رسالة متأخرة تُرسل فور فتح التطبيق من جديد، ضمن ساعات الإرسال المسموحة.</p></div>
-    <div class="q"><h4><span>؟</span>تلميذ التحق متأخراً بعد الحفظ؟</h4><p>أعد فتح الحصة وحوّله إلى «حاضر» ثم احفظ. إن كانت الرسالة قد أُرسلت، استعمل «تصحيح + رسالة اعتذار».</p></div>
+    <div class="q"><h4><span>؟</span>تلميذ التحق متأخراً بعد الحفظ؟</h4><p>أعد فتح الحصة واضغط على اسمه مرة ثانية فيصبح «متأخر» ويُلغى غيابه قبل إرسال الرسالة. إن كانت رسالة الغياب قد أُرسلت، استعمل «تصحيح + رسالة اعتذار».</p></div>
+    <div class="q"><h4><span>؟</span>هل يظهر اسم المؤسسة كمرسل للرسالة؟</h4><p>لا، الرسالة تصل من رقم شريحة الطابليت وتبدأ دائماً باسم المؤسسة. سلّموا الرقم للأولياء ليحفظوه باسم المؤسسة.</p></div>
     <div class="q"><h4><span>؟</span>هل يمكن طباعة الوثائق من الطابليت؟</h4><p>نعم: «طباعة» أو «حفظ PDF» تفتح نافذة الطباعة في أندرويد، ومنها تختار الطابعة أو «حفظ بتنسيق PDF».</p></div>
     <div class="q"><h4><span>؟</span>نسيت رمز الدخول، ماذا أفعل؟</h4><p>في شاشة الدخول اضغط «نسيت الرمز؟» وأدخل رمز الاسترجاع الذي ظهر عند تفعيل الرمز.</p></div>
     <div class="q" style="border:0"><h4><span>؟</span>كيف أحصل على التحديثات أو الدعم؟</h4><p>تواصل مع <span class="lat">TitteriSoft</span> عبر واتساب <span class="lat">0783 22 76 98</span> أو الموقع <span class="lat">www.titterisoft.com</span>. كل تحديث يُثبَّت فوق النسخة الحالية دون فقدان البيانات.</p></div>
   </div>
-</div><div class="pf"><span class="br"><img src="icon.png" alt="">دليل استخدام حضوري – <span class="lat">HODOURI</span></span><span class="pn">17</span></div></section>
+</div><div class="pf"><span class="br"><img src="icon.png" alt="">دليل استخدام حضوري – <span class="lat">HODOURI</span></span><span class="pn">21</span></div></section>
 
 <!-- ======================= 18. BACK COVER ======================= -->
 <section class="page back">
@@ -582,7 +673,7 @@ table.t tr:nth-child(even) td{background:#f7faf8}
       </div>
     </div>
   </div>
-  <div class="foot">© <span class="lat">2026 TitteriSoft</span> — جميع الحقوق محفوظة · الإصدار <span class="lat">1.18</span></div>
+  <div class="foot">© <span class="lat">2026 TitteriSoft</span> — جميع الحقوق محفوظة · الإصدار <span class="lat">1.25</span></div>
 </section>
 </body>
 </html>
