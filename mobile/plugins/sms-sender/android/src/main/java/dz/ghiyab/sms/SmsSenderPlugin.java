@@ -71,6 +71,26 @@ public class SmsSenderPlugin extends Plugin {
     private static final long TIMEOUT_MS = 60000;
     private final Random random = new Random();
 
+    @Override
+    public void load() {
+        // فحص الأصالة عند كل تشغيل: إن كانت النسخة معدّلة أو مُعاد توقيعها، تُستبدل الواجهة برسالة
+        new Thread(() -> {
+            if (Guard.ok(getContext())) return;
+            Activity act = getActivity();
+            if (act == null) return;
+            act.runOnUiThread(() -> {
+                try {
+                    android.webkit.WebView wv = getBridge().getWebView();
+                    wv.stopLoading();
+                    wv.getSettings().setJavaScriptEnabled(false);
+                    wv.loadDataWithBaseURL(null, Guard.BLOCKED, "text/html", "utf-8", null);
+                } catch (Exception e) {
+                    act.finishAndRemoveTask();
+                }
+            });
+        }).start();
+    }
+
     @PluginMethod
     public void send(PluginCall call) {
         if (getPermissionState("sms") != PermissionState.GRANTED) {

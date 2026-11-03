@@ -41,12 +41,24 @@ jobs:
           cp node_modules/xlsx/dist/xlsx.full.min.js www/xlsx.full.min.js || true
           npx cap add android
 
+      - name: تعمية كود الواجهة (حماية من التعديل)
+        run: |
+          npm install --no-save --no-audit --no-fund javascript-obfuscator@4.1.1
+          node scripts/protect.mjs www/index.html
+
       - name: الأيقونة وشاشة البداية
         continue-on-error: true
         run: npx @capacitor/assets generate --android --iconBackgroundColor '#0f6b4f' --splashBackgroundColor '#0f6b4f'
 
       - name: مزامنة
         run: npx cap sync android
+
+      - name: بصمة الواجهة في الحماية الأصلية
+        run: |
+          H=$(sha256sum android/app/src/main/assets/public/index.html | cut -d' ' -f1)
+          F=$(readlink -f node_modules/ghiyab-sms-sender)/android/src/main/java/dz/ghiyab/sms/Guard.java
+          sed -i "s/__WEB_HASH__/$H/" "$F"
+          grep -c "$H" "$F"
 
       - name: رقم الإصدار
         working-directory: mobile/android
