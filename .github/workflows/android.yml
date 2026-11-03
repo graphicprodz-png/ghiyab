@@ -95,3 +95,22 @@ jobs:
             ملف التثبيت على الطابليت: **hodouri.apk**
             حمّله من الطابليت، افتحه، واسمح بتثبيت التطبيقات من مصادر غير معروفة إذا طُلب ذلك.
           files: mobile/hodouri.apk
+
+      - name: تحديث رابط التحميل في موقع titterisoft.com
+        continue-on-error: true
+        working-directory: .
+        env:
+          SITE_TOKEN: ${{ secrets.SITE_TOKEN }}
+          VER: 1.${{ github.run_number }}
+        run: |
+          if [ -z "$SITE_TOKEN" ]; then echo "SITE_TOKEN غير مضبوط: تخطي تحديث الموقع"; exit 0; fi
+          git clone --depth 1 "https://x-access-token:${SITE_TOKEN}@github.com/graphicprodz-png/titterisoft-website.git" site
+          cp mobile/hodouri.apk site/public/apks/Hodouri.apk
+          cd site
+          node scripts/update-app.mjs hodouri "$VER" public/apks/Hodouri.apk
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --quiet && { echo "لا تغيير"; exit 0; }
+          git commit -m "حضوري $VER: تحديث تلقائي لملف التحميل"
+          git push origin HEAD:main
