@@ -70,6 +70,7 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--brand);outline-o
 .stat b{display:block;font-size:22px}
 .stat span{font-size:12px;color:var(--muted)}
 table{width:100%;border-collapse:collapse;font-size:14px}
+.ftab{table-layout:fixed}.ftab td,.ftab th{padding:6px 3px}.ftab input{width:100%;min-width:0;padding:7px 4px;font-size:14px;box-sizing:border-box}.ftab .btn{padding:6px 8px;width:100%}
 td,th{padding:8px 6px;border-bottom:1px solid var(--line);text-align:start}
 th{font-size:12.5px;color:var(--muted);font-weight:600}
 td.ltr{direction:ltr;text-align:end}
@@ -2183,12 +2184,12 @@ function periodsCard(){
     <div class="f">أيام الدراسة</div>
     <div style="display:flex;flex-wrap:wrap;gap:12px;margin-bottom:12px">${DAY_ORDER.map(d=>`<label class="switch" style="margin:0"><input type="checkbox" ${days.includes(d)?"checked":""} onchange="toggleDay(${d},this.checked)"> ${DAY_NAMES[d]}</label>`).join("")}</div>
     <div class="f">فترات الحصص</div>
-    <table><tr><th>#</th><th>من</th><th>إلى</th><th></th></tr>
+    <table class="ftab"><colgroup><col style="width:26px"><col><col><col style="width:58px"></colgroup><tr><th>#</th><th>من</th><th>إلى</th><th></th></tr>
     ${sortedPeriods().map((p,i)=>`<tr><td>${i+1}</td><td><input type="time" value="${p.from}" onchange="setPeriod('${p.id}','from',this.value)"></td><td><input type="time" value="${p.to}" onchange="setPeriod('${p.id}','to',this.value)"></td>
       <td><button class="btn ghost sm" onclick="delPeriod('${p.id}')">حذف</button></td></tr>`).join("")}</table>
     <button class="btn ghost" style="margin-top:8px" onclick="addPeriod()">+ فترة</button></div>
   <div class="card"><h2>الفصول الدراسية</h2>
-    <table><tr><th>الفصل</th><th>من</th><th>إلى</th><th></th></tr>
+    <table class="ftab"><colgroup><col style="width:28%"><col><col><col style="width:58px"></colgroup><tr><th>الفصل</th><th>من</th><th>إلى</th><th></th></tr>
     ${(S.cfg.terms||[]).map((t,i)=>`<tr><td><input value="${esc(t.name)}" onchange="setTerm(${i},'name',this.value)"></td><td><input type="date" value="${t.from}" onchange="setTerm(${i},'from',this.value)"></td><td><input type="date" value="${t.to}" onchange="setTerm(${i},'to',this.value)"></td>
       <td><button class="btn ghost sm" onclick="saveCfg({...S.cfg,terms:S.cfg.terms.filter((_,j)=>j!==${i})})">حذف</button></td></tr>`).join("")}</table>
     <button class="btn ghost" style="margin-top:8px" onclick="saveCfg({...S.cfg,terms:[...(S.cfg.terms||[]),{name:'فصل جديد',from:todayStr(),to:todayStr()}]})">+ فصل</button>
